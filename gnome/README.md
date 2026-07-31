@@ -1,0 +1,233 @@
+# Glow
+
+A soft colored aura around the focused window in GNOME Shell, plus a coherent
+set of theme tweaks for a unified Dodger Blue + yellow-folders look.
+
+Designed for **Zorin OS 18** and any GNOME-based desktop running GNOME 45–52.
+
+License: **GPL-3.0-or-later**
+
+## What it does
+
+Five independent modules, applied in sequence:
+
+### 1. `focus-glow`
+GNOME Shell extension that draws a thin Dodger Blue (`#1e90ff`) aura around the
+currently focused window. Works with **every** application — GTK3, GTK4 /
+libadwaita, Electron, Sublime Text, Eclipse, Qt — because it operates at the
+compositor level.
+
+- Strip thickness: 2px
+- Blur: 6px
+- Opacity: 0.95
+- Fully configurable in `extension.js` (no repackage needed)
+
+### 2. `theme-tweaks`
+GTK3 + GTK4 CSS overrides:
+
+- **Square window corners** — all four corners straight (GNOME defaults to
+  rounded top corners only)
+- **Dodger Blue accent everywhere** — selected rows, checked toggles,
+  breadcrumbs, switches, progress bars, calendars, menu hovers — every accent
+  state matches the focus-glow color
+
+Applied as a marked block (`GLOW START / END`) inside `~/.config/gtk-{3,4}.0/gtk.css`.
+Existing user CSS is preserved.
+
+### 3. `yellow-folders`
+Installs the **Papirus** icon theme with yellow folders.
+
+- Installs `papirus-icon-theme` via apt
+- Installs `papirus-folders` from upstream GitHub
+- Sets folder color to yellow on all Papirus variants
+- **Colorize fix** — copies the colored 64×64 yellow folder SVGs into the
+  small-size icon directories (16, 22, 24, 32, 48 px), so Nemo / Files show
+  yellow folders even in list view at standard zoom (Papirus serves symbolic
+  monochrome icons at those sizes by default)
+- Forces **Papirus-Light** even when the desktop is in dark mode, so folders
+  stay yellow
+
+### 4. `nemo-icon`
+Overrides Nemo's default grey "drawer" icon in the taskbar / app menu with a
+yellow folder, matching the rest of the file manager UI.
+
+Implemented as a user-level `.desktop` override in
+`~/.local/share/applications/nemo.desktop` — only the `Icon=` field is
+changed, the system file is untouched.
+
+### 5. `nemo-zoom`
+Sets a compact default zoom level for Nemo so the content-area font size
+matches the sidebar / menu (Nemo defaults to a slightly larger size in icon
+view and standard list view, which often looks oversized next to the
+sidebar).
+
+- Sets icon-view, list-view and compact-view default zoom to `'smaller'`
+- Clears stale per-folder metadata so previously-visited folders don't keep
+  old larger-zoom overrides
+- `--remove` resets the three zoom defaults to their schema defaults
+
+## Installation
+
+```bash
+tar -xzf glow.tar.gz
+cd glow
+bash install.sh
+```
+
+Requires `sudo` (for apt packages and `/usr/share/icons` modifications).
+Password is requested once and kept alive for the duration of the script.
+
+After install: **log out and back in**. Wayland does not reload GNOME Shell
+extensions or some CSS without a fresh session.
+
+## Usage
+
+```bash
+# Single modules
+bash install.sh focus-glow
+bash install.sh theme-tweaks
+bash install.sh yellow-folders
+bash install.sh nemo-icon
+bash install.sh nemo-zoom
+
+# Remove everything
+bash install.sh --remove
+
+# Remove a single module
+bash install.sh nemo-icon --remove
+
+# List modules
+bash install.sh --list
+
+# Help
+bash install.sh --help
+```
+
+The installer is **idempotent**: running it again over an existing install
+updates files in place rather than duplicating them.
+
+## What it modifies
+
+### focus-glow
+- Creates: `~/.local/share/gnome-shell/extensions/glow@nebula.local/`
+- Enables the extension via `gnome-extensions enable`
+
+### theme-tweaks
+- Appends a `GLOW START / END` block in `~/.config/gtk-4.0/gtk.css`
+- Same block in `~/.config/gtk-3.0/gtk.css`
+- Pre-existing user CSS in those files is preserved
+
+### yellow-folders
+- `apt install papirus-icon-theme`
+- `wget` install of `papirus-folders` to `/usr/local/bin`
+- Modifies small-size folder SVGs in
+  `/usr/share/icons/Papirus{,-Light,-Dark}/<size>/places/` (full backup at
+  `/usr/share/icons/_glow-colorize-backup/`)
+- Changes `gsettings` `icon-theme` on GNOME and Cinnamon schemas
+- State file in `~/.config/glow/yellow-folders.state` (used by `--remove`)
+
+### nemo-icon
+- Creates `~/.local/share/applications/nemo.desktop` (user-level override)
+
+### nemo-zoom
+- Sets `org.nemo.{icon,list,compact}-view default-zoom-level` to `'smaller'` via gsettings
+- On install, clears `~/.local/share/gvfs-metadata/*` (per-folder Nemo metadata cache) so previously-visited folders use the new defaults
+- On `--remove`, resets the three gsettings keys; per-folder metadata is left as-is
+
+### What it does NOT modify
+- Distribution themes (`/usr/share/themes/*`) — untouched
+- Adwaita — untouched
+- Critical system files — untouched
+- The Papirus apt package stays installed after `--remove`. To fully remove:
+  `sudo apt remove papirus-icon-theme`
+
+## Customization
+
+### Glow color, thickness, blur
+Edit `~/.local/share/gnome-shell/extensions/glow@nebula.local/extension.js`:
+
+```javascript
+const CFG = {
+    color: 'rgba(30, 144, 255, 0.95)',   // change here
+    blur: 6,
+    stripWidth: 2,
+    fadeMs: 180,
+    followMove: true,
+};
+```
+
+Then log out / log in.
+
+### Accent color
+Find / replace `#1e90ff` in `assets/css/gtk4.css` and `assets/css/gtk3.css`,
+then re-run `bash install.sh theme-tweaks`.
+
+### Folder color
+Replace `yellow` in `modules/yellow-folders.sh` (function `apply_yellow_color`)
+with one of the colors supported by papirus-folders:
+
+```
+adwaita, black, blue, bluegrey, breeze, brown, carmine, cyan, darkcyan,
+deeporange, green, grey, indigo, magenta, nordic, orange, palebrown,
+paleorange, pink, red, teal, violet, white, yaru
+```
+
+Or change it manually:
+
+```bash
+sudo papirus-folders -t Papirus -C <color>
+```
+
+## Requirements
+
+- GNOME Shell 45–52
+- Tested on Zorin OS 18 / 18.1 (GNOME 46) — Wayland and X11
+- `sudo`
+- Internet (for apt + wget)
+
+## Honest limitations
+
+The tweaks operate at the GNOME / GTK level. The following apps do **not** read
+the package's CSS, and keep their own internal colors:
+
+- **Electron apps** (VS Code, Slack, Discord) — the focus glow surrounds them,
+  but title bars / selections inside are decided by the app
+- **Sublime Text, Eclipse, JetBrains IDEs** — proprietary toolkits (SWT, Skia)
+- **Qt / KDE apps** — do not read GTK CSS
+
+The focus-glow extension itself **does work everywhere**, because it runs at
+the Mutter compositor level above all windows.
+
+## Repo structure
+
+```
+glow/
+├── install.sh             ← master orchestrator
+├── README.md
+├── LICENSE                ← GPL-3.0-or-later
+├── assets/
+│   ├── extension/         ← extension.js + metadata.json
+│   └── css/               ← gtk3.css + gtk4.css
+└── modules/
+    ├── _lib.sh            ← shared logging helpers
+    ├── focus-glow.sh
+    ├── theme-tweaks.sh
+    ├── yellow-folders.sh
+    ├── nemo-icon.sh
+    └── nemo-zoom.sh
+```
+
+## Full uninstall
+
+```bash
+bash install.sh --remove
+```
+
+Removes everything in reverse order:
+- Nemo override
+- Papirus icon backups restored
+- Previous icon theme restored (read from state file)
+- CSS blocks removed (preserving any other user CSS)
+- GNOME Shell extension disabled and deleted
+
+After logout / login, you are exactly where you were before the install.

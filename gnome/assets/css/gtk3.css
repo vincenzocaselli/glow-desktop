@@ -1,0 +1,109 @@
+/* ============================================================
+   GLOW — GTK3
+   Same intent as the GTK4 file, but with GTK3 selectors so it
+   covers legacy apps (Nemo, Inkscape, GIMP 2.x, ...).
+   ============================================================ */
+
+/* ---------- square corners ---------- */
+
+headerbar,
+.titlebar,
+headerbar.titlebar {
+  border-radius: 0;
+}
+
+decoration,
+decoration-overlay {
+  border-radius: 0;
+}
+
+window.csd,
+window.csd.background {
+  border-radius: 0;
+}
+
+/* ---------- Dodger Blue accent ---------- */
+
+@define-color theme_selected_bg_color   #1e90ff;
+@define-color theme_selected_fg_color   #ffffff;
+
+/* --- list / tree / grid / icon view selection --- */
+row:selected,
+row:selected:hover,
+row:selected:focus,
+.view:selected,
+treeview.view:selected,
+iconview:selected,
+.sidebar row:selected,
+placessidebar row:selected,
+flowbox flowboxchild:selected {
+  background-color: #1e90ff;
+  color: #ffffff;
+}
+
+/* --- checked / active buttons --- */
+button:checked,
+button:checked:hover,
+button.toggle:checked,
+button.flat:checked,
+togglebutton:checked,
+.linked > button:checked,
+headerbar button:checked,
+.titlebar button:checked {
+  background-color: #1e90ff;
+  color: #ffffff;
+}
+
+/* --- current directory in Nemo / Nautilus path bar --- */
+.path-bar button:checked,
+.path-bar button.current-dir,
+NemoPathBar button:checked,
+NemoPathBar button.current-dir,
+pathbar button:checked,
+pathbar button.current-dir {
+  background-color: #1e90ff;
+  color: #ffffff;
+}
+
+/* --- text selection --- */
+entry selection,
+textview selection,
+.entry selection {
+  background-color: #1e90ff;
+  color: #ffffff;
+}
+
+/* --- checks, radios, switches --- */
+check:checked,
+radio:checked {
+  background-color: #1e90ff;
+  border-color: #1e90ff;
+  color: #ffffff;
+}
+switch:checked {
+  background-color: #1e90ff;
+}
+switch:checked slider {
+  background-color: #ffffff;
+}
+
+/* --- progress / level bar --- */
+progressbar progress,
+progressbar > trough > progress,
+levelbar block.filled {
+  background-color: #1e90ff;
+}
+
+/* --- suggested-action button --- */
+button.suggested-action {
+  background-color: #1e90ff;
+  color: #ffffff;
+}
+
+/* --- menu hover / active --- */
+menuitem:hover,
+menuitem:active,
+.menu menuitem:hover {
+  background-color: #1e90ff;
+  color: #ffffff;
+}
