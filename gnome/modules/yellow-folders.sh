@@ -75,10 +75,9 @@ colorize_small_folders() {
                 sudo find "$dst_dir" -maxdepth 1 -name "folder*.svg" -exec cp -a {} "$backup_dir/" \;
             fi
 
-            sudo find "$src_64" -maxdepth 1 -name "folder*.svg" -print0 | \
-                while IFS= read -r -d '' src; do
-                    sudo cp -f "$src" "$dst_dir/$(basename "$src")"
-                done
+            # Single find -exec (no sudo nested in a pipe subshell — the
+            # sudo find | while sudo cp pattern can deadlock on live systems)
+            sudo find "$src_64" -maxdepth 1 -name "folder*.svg" -exec cp -ft "$dst_dir" {} +
         done
     done
 
@@ -100,10 +99,7 @@ restore_small_folders() {
             local backup_dir="$COLORIZE_BACKUP/$theme/$size/places"
             local dst_dir="/usr/share/icons/$theme/$size/places"
             [[ -d "$backup_dir" && -d "$dst_dir" ]] || continue
-            sudo find "$backup_dir" -maxdepth 1 -name "*.svg" -print0 | \
-                while IFS= read -r -d '' f; do
-                    sudo cp -af "$f" "$dst_dir/$(basename "$f")"
-                done
+            sudo find "$backup_dir" -maxdepth 1 -name "*.svg" -exec cp -aft "$dst_dir" {} +
         done
         sudo gtk-update-icon-cache -f "/usr/share/icons/$theme" 2>/dev/null || true
     done
