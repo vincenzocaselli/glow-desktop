@@ -3,7 +3,7 @@
     "name": "Glow",
     "description": "Draws a soft colored aura around the currently focused window. Works with any application — GTK, Electron, Qt, SWT — because it runs at the compositor level. Color, blur, and thickness are configurable in extension.js.",
     "shell-version": ["45", "46", "47", "48", "49", "50", "51", "52"],
-    "url": "https://github.com/GITHUB_USER/glow",
+    "url": "https://github.com/vincenzocaselli/glow-desktop",
     "version": 1,
     "version-name": "1.0"
 }

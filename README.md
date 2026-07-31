@@ -52,8 +52,8 @@ where you started).
 ### GNOME (Zorin OS 18, Ubuntu 24.04+, any GNOME 45–52 desktop)
 
 ```bash
-git clone https://github.com/GITHUB_USER/glow.git
-cd glow/gnome
+git clone https://github.com/vincenzocaselli/glow-desktop.git
+cd glow-desktop/gnome
 bash install.sh
 ```
 
@@ -63,8 +63,8 @@ per-module usage, customization and full uninstall.
 ### KDE Plasma 6
 
 ```bash
-git clone https://github.com/GITHUB_USER/glow.git
-cd glow/kde
+git clone https://github.com/vincenzocaselli/glow-desktop.git
+cd glow-desktop/kde
 bash install.sh
 ```
 
