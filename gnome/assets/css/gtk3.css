@@ -65,6 +65,45 @@ pathbar button.current-dir {
   color: #ffffff;
 }
 
+/* --- unfocused windows (backdrop): themes dim the text color to
+       gray while our blue background stays, making labels unreadable.
+       Keep white text on the accent in backdrop too. --- */
+row:selected:backdrop,
+.view:selected:backdrop,
+treeview.view:selected:backdrop,
+iconview:selected:backdrop,
+.sidebar row:selected:backdrop,
+placessidebar row:selected:backdrop,
+flowbox flowboxchild:selected:backdrop,
+button:checked:backdrop,
+button.toggle:checked:backdrop,
+button.flat:checked:backdrop,
+togglebutton:checked:backdrop,
+.linked > button:checked:backdrop,
+headerbar button:checked:backdrop,
+.titlebar button:checked:backdrop,
+.path-bar button:checked:backdrop,
+.path-bar button.current-dir:backdrop,
+NemoPathBar button:checked:backdrop,
+NemoPathBar button.current-dir:backdrop,
+pathbar button:checked:backdrop,
+pathbar button.current-dir:backdrop,
+button.suggested-action:backdrop {
+  background-color: #1e90ff;
+  color: #ffffff;
+}
+
+/* some themes dim the label directly, not the button */
+button:checked:backdrop label,
+.path-bar button:checked:backdrop label,
+.path-bar button.current-dir:backdrop label,
+NemoPathBar button:checked:backdrop label,
+NemoPathBar button.current-dir:backdrop label,
+pathbar button:checked:backdrop label,
+pathbar button.current-dir:backdrop label {
+  color: #ffffff;
+}
+
 /* --- text selection --- */
 entry selection,
 textview selection,

@@ -68,6 +68,40 @@ pathbar button.current-dir {
   color: #ffffff;
 }
 
+/* --- unfocused windows (backdrop): keep white text on the accent,
+       otherwise themes dim it to gray over our blue background --- */
+row:selected:backdrop,
+.view:selected:backdrop,
+treeview.view:selected:backdrop,
+columnview > listview > row:selected:backdrop,
+listview > row:selected:backdrop,
+gridview > child:selected:backdrop,
+flowbox > flowboxchild:selected:backdrop,
+iconview:selected:backdrop,
+button:checked:backdrop,
+button.toggle:checked:backdrop,
+button.flat:checked:backdrop,
+togglebutton:checked:backdrop,
+.linked > button:checked:backdrop,
+headerbar button:checked:backdrop,
+.titlebar button:checked:backdrop,
+.path-bar button:checked:backdrop,
+.path-bar button.current-dir:backdrop,
+pathbar button:checked:backdrop,
+pathbar button.current-dir:backdrop,
+button.suggested-action:backdrop {
+  background-color: #1e90ff;
+  color: #ffffff;
+}
+
+button:checked:backdrop label,
+.path-bar button:checked:backdrop label,
+.path-bar button.current-dir:backdrop label,
+pathbar button:checked:backdrop label,
+pathbar button.current-dir:backdrop label {
+  color: #ffffff;
+}
+
 /* --- text selection inside entries / textviews --- */
 entry selection,
 textview text selection,
