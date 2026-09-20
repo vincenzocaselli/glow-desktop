@@ -9,6 +9,7 @@
  * ============================================================ */
 
 import Clutter from 'gi://Clutter';
+import GLib from 'gi://GLib';
 import St from 'gi://St';
 
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
@@ -32,6 +33,19 @@ const CFG = {
 
     // Follow the window while moved/resized.
     followMove: true,
+
+    // How long the focus must hold still before the glow moves, in ms.
+    // Below the threshold of perception for an ordinary window switch.
+    focusSettleMs: 40,
+
+    // Two focus changes closer together than this belong to a burst:
+    // an application is mapping several windows at once, as a browser
+    // does when it restores its session. The glow leaves the screen
+    // for the duration rather than jumping from window to window.
+    burstGapMs: 500,
+
+    // How much calm ends a burst and brings the glow back.
+    burstSettleMs: 400,
 };
 
 // -------------------- FrameGlow --------------------
@@ -146,11 +160,16 @@ export default class Glow extends Extension {
         this._currentWindow = null;
         this._positionChangedId = 0;
         this._sizeChangedId = 0;
+        this._unmanagedId = 0;
+        this._settleId = 0;
+        this._lastFocusMs = 0;
+        this._inBurst = false;
 
-        this._onFocusChanged();
+        this._applyFocus();
     }
 
     disable() {
+        this._cancelSettle();
         this._disconnectWindowSignals();
         if (this._focusHandlerId) {
             global.display.disconnect(this._focusHandlerId);
@@ -161,7 +180,47 @@ export default class Glow extends Extension {
         this._currentWindow = null;
     }
 
+    // Act on the window that holds the focus once it stops moving.
+    // Each event cancels the pending one, so a run of focus changes
+    // produces a single update at the end.
     _onFocusChanged() {
+        const nowMs = GLib.get_monotonic_time() / 1000;
+        const gap = nowMs - this._lastFocusMs;
+        this._lastFocusMs = nowMs;
+
+        this._cancelSettle();
+
+        // Changes this close together mean windows are being mapped in
+        // sequence. Take the glow off screen: following the focus here
+        // is what makes it flicker.
+        if (gap < CFG.burstGapMs && !this._inBurst) {
+            this._inBurst = true;
+            this._disconnectWindowSignals();
+            this._glow.hide();
+        }
+
+        const delay = this._inBurst ? CFG.burstSettleMs : CFG.focusSettleMs;
+
+        this._settleId = GLib.timeout_add(
+            GLib.PRIORITY_DEFAULT,
+            delay,
+            () => {
+                this._settleId = 0;
+                this._inBurst = false;
+                this._applyFocus();
+                return GLib.SOURCE_REMOVE;
+            }
+        );
+    }
+
+    _cancelSettle() {
+        if (this._settleId) {
+            GLib.Source.remove(this._settleId);
+            this._settleId = 0;
+        }
+    }
+
+    _applyFocus() {
         const win = global.display.focus_window;
         this._disconnectWindowSignals();
 
@@ -177,8 +236,24 @@ export default class Glow extends Extension {
             return;
         }
 
+        // A window still being mapped can report a degenerate frame.
+        // The four strips would then overlap and their shadows would
+        // add up into a thick blot.
+        const rect = win.get_frame_rect();
+        if (rect.width < 2 * CFG.stripWidth || rect.height < 2 * CFG.stripWidth) {
+            this._glow.hide();
+            return;
+        }
+
         this._currentWindow = win;
         this._glow.attachTo(windowActor, win);
+
+        // A closed window is finalized: clear the state here rather
+        // than calling disconnect() on it afterwards.
+        this._unmanagedId = win.connect(
+            'unmanaged',
+            () => this._onWindowUnmanaged()
+        );
 
         if (CFG.followMove) {
             this._positionChangedId = win.connect(
@@ -192,16 +267,31 @@ export default class Glow extends Extension {
         }
     }
 
+    _onWindowUnmanaged() {
+        this._currentWindow = null;
+        this._positionChangedId = 0;
+        this._sizeChangedId = 0;
+        this._unmanagedId = 0;
+        this._glow?.hide();
+    }
+
     _disconnectWindowSignals() {
-        if (this._currentWindow) {
-            if (this._positionChangedId) {
-                this._currentWindow.disconnect(this._positionChangedId);
-                this._positionChangedId = 0;
-            }
-            if (this._sizeChangedId) {
-                this._currentWindow.disconnect(this._sizeChangedId);
-                this._sizeChangedId = 0;
-            }
+        const win = this._currentWindow;
+        this._currentWindow = null;
+        if (!win)
+            return;
+
+        if (this._positionChangedId) {
+            win.disconnect(this._positionChangedId);
+            this._positionChangedId = 0;
+        }
+        if (this._sizeChangedId) {
+            win.disconnect(this._sizeChangedId);
+            this._sizeChangedId = 0;
+        }
+        if (this._unmanagedId) {
+            win.disconnect(this._unmanagedId);
+            this._unmanagedId = 0;
         }
     }
 }
