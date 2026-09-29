@@ -102,13 +102,18 @@ pathbar button.current-dir:backdrop label {
   color: #ffffff;
 }
 
-/* --- text selection inside entries / textviews --- */
+/* --- text selection: glass, lighter than rows so text stays readable --- */
 entry selection,
+entry selection:backdrop,
+text selection,
+text selection:backdrop,
 textview text selection,
+textview text selection:backdrop,
 textview selection,
-label selection {
-  background-color: #1e90ff;
-  color: #ffffff;
+label selection,
+label selection:backdrop {
+  background-color: rgba(30, 144, 255, 0.35);
+  color: @window_fg_color;
 }
 
 /* --- checks, radios, switches in the "on" state --- */
@@ -134,18 +139,151 @@ button.suggested-action {
   color: #ffffff;
 }
 
-/* --- menu hover / selected --- */
+/* --- menu hover / selected: same glass as the selection --- */
 menuitem:hover,
 menuitem:active,
 .menu > menuitem:hover,
 popover menuitem:hover,
 popover .model button:checked {
-  background-color: #1e90ff;
-  color: #ffffff;
+  background-color: rgba(30, 144, 255, 0.50);
+  background-image: none;
+  color: @window_fg_color;
 }
 
-/* --- calendar today / selected day --- */
-calendar:selected {
-  background-color: #1e90ff;
-  color: #ffffff;
+/* --- selected day in calendars: same glass as the selection --- */
+calendar:selected,
+calendar > grid > label.day-number:selected,
+calendar > grid > label.day-number:selected:backdrop {
+  background-color: rgba(30, 144, 255, 0.50);
+  background-image: none;
+  border-radius: 6px;
+  color: @window_fg_color;
+}
+
+/* ---------- glass selection ----------
+   Translucent and rounded, as in GTK3, but without the gap between
+   rows. GTK4 rows are real widgets: a margin changes their
+   allocation, shifting the selected rows and pushing their
+   neighbors away. The :focus variants keep the last selected row
+   from staying solid. */
+
+columnview listview > row:selected,
+columnview listview > row:selected:focus,
+columnview listview > row:selected:focus-visible,
+columnview listview > row:selected:focus-within,
+columnview listview > row:selected:hover,
+listview > row:selected,
+listview > row:selected:focus,
+listview > row:selected:focus-visible,
+listview > row:selected:focus-within,
+listview > row:selected:hover,
+gridview > child:selected,
+gridview > child:selected:focus,
+gridview > child:selected:focus-visible,
+gridview > child:selected:hover,
+.view:selected,
+.view:selected:focus,
+flowbox > flowboxchild:selected,
+flowbox > flowboxchild:selected:focus {
+  background-color: rgba(30, 144, 255, 0.50);
+  background-image: none;
+  border-radius: 6px;
+  color: @window_fg_color;
+}
+
+/* Unfocused windows, list box rows, checked buttons (view mode,
+   sidebar toggle) and the current directory in the path bar get
+   the same glass: the solid rules earlier in this file would
+   otherwise win. */
+row:selected,
+row:selected:hover,
+row:selected:focus,
+row:selected:backdrop,
+.view:selected:backdrop,
+columnview listview > row:selected:backdrop,
+listview > row:selected:backdrop,
+gridview > child:selected:backdrop,
+flowbox > flowboxchild:selected:backdrop,
+button:checked,
+button:checked:hover,
+button:checked:backdrop,
+button.toggle:checked,
+button.toggle:checked:backdrop,
+button.flat:checked,
+button.flat:checked:backdrop,
+togglebutton:checked,
+togglebutton:checked:backdrop,
+.linked > button:checked,
+.linked > button:checked:backdrop,
+headerbar button:checked,
+headerbar button:checked:backdrop,
+.titlebar button:checked,
+.titlebar button:checked:backdrop,
+.path-bar button:checked,
+.path-bar button:checked:backdrop,
+.path-bar button.current-dir,
+.path-bar button.current-dir:backdrop,
+pathbar button:checked,
+pathbar button:checked:backdrop,
+pathbar button.current-dir,
+pathbar button.current-dir:backdrop {
+  background-color: rgba(30, 144, 255, 0.50);
+  background-image: none;
+  border-radius: 6px;
+  color: @window_fg_color;
+}
+
+button:checked:backdrop label,
+.path-bar button:checked:backdrop label,
+.path-bar button.current-dir:backdrop label,
+pathbar button:checked:backdrop label,
+pathbar button.current-dir:backdrop label {
+  color: @window_fg_color;
+}
+
+/* ---------- sidebar icons at full strength ----------
+   The theme dims sidebar icons to 70%, a choice made for gray
+   symbolic icons. With the color icons of yellow-folders the dimming
+   washes them out. */
+row image.sidebar-icon {
+  opacity: 1;
+}
+
+/* ---------- white backgrounds ----------
+   The theme tints window and sidebar backgrounds blue-gray, and
+   gray in unfocused windows. White everywhere matches Nemo, where
+   file lists and the sidebar sit on the white view background.
+   Title bars follow window_bg_color, so they turn white too. */
+@define-color window_bg_color                     #ffffff;
+@define-color window_backdrop_color               #ffffff;
+@define-color sidebar_bg_color                    #ffffff;
+@define-color sidebar_backdrop_color              #ffffff;
+@define-color secondary_sidebar_bg_color          #ffffff;
+@define-color secondary_sidebar_backdrop_color    #ffffff;
+
+/* ---------- light gray dividers ----------
+   On white backgrounds the areas no longer stand apart by color.
+   Thin lines mark them instead: below the title bars, between the
+   sidebar and the content, and between the list column headers. */
+@define-color glow_divider_color                  #dedede;
+@define-color sidebar_border_color                @glow_divider_color;
+@define-color secondary_sidebar_border_color      @glow_divider_color;
+
+toolbarview > .top-bar {
+  box-shadow: inset 0 -1px @glow_divider_color;
+}
+
+columnview > header > button {
+  border-left-color: @glow_divider_color;
+}
+
+/* The sidebar draws its edge as an inset shadow, which its own
+   content covers. A real border stays visible. */
+.sidebar-pane:dir(ltr) {
+  border-right: 1px solid @glow_divider_color;
+  box-shadow: none;
+}
+.sidebar-pane:dir(rtl) {
+  border-left: 1px solid @glow_divider_color;
+  box-shadow: none;
 }

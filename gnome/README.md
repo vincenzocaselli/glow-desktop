@@ -30,6 +30,24 @@ GTK3 + GTK4 CSS overrides:
 - **Dodger Blue accent everywhere** — selected rows, checked toggles,
   breadcrumbs, switches, progress bars, calendars, menu hovers — every accent
   state matches the focus-glow color
+- **Glass selection** — selected rows, checked buttons, the current directory
+  in the path bar, menu items under the pointer, and the selected calendar day
+  are translucent and rounded, in focused and unfocused windows alike.
+  Selected text uses a lighter glass, so it stays readable. In Nemo (GTK3), a thin gap separates adjacent
+  selected rows. In Files (GTK4) the rows touch, because a gap would shift
+  the rows
+- **White backgrounds (GTK4)** — windows, title bars, and sidebars are white,
+  with or without focus, instead of the theme's blue-gray and gray. Applies to
+  every GTK4 / libadwaita app, not just Files
+- **Same selection in Eclipse** — Eclipse (SWT) reads its selection colors
+  from the GTK theme file, not from `gtk.css`. The module activates
+  `<theme>-Glow`, a theme that imports the current one and only replaces the
+  selection colors with the opaque equivalent of the glass (`#8fc8ff`)
+- **Light gray dividers (GTK4)** — thin `#dedede` lines below the title bars,
+  between the sidebar and the content, and between list column headers, so
+  the areas stay distinct on white
+- **Sidebar icons at full strength (GTK4)** — the theme dims sidebar icons to
+  70%, which washes out the color icons of `yellow-folders`
 
 Applied as a marked block (`GLOW START / END`) inside `~/.config/gtk-{3,4}.0/gtk.css`.
 Existing user CSS is preserved.
@@ -44,7 +62,12 @@ Installs the **Papirus** icon theme with yellow folders.
   small-size icon directories (16, 22, 24, 32, 48 px), so Nemo / Files show
   yellow folders even in list view at standard zoom (Papirus serves symbolic
   monochrome icons at those sizes by default)
-- Forces **Papirus-Light** even when the desktop is in dark mode, so folders
+- **Color sidebar icons** — builds **Papirus-Light-Glow**, a theme that
+  inherits Papirus-Light and replaces the monochrome sidebar icons of Nemo and
+  Files (folders, trash, drives) with color ones. Dialog icons stay monochrome.
+  The theme needs `python3-gi`: without it, the module falls back to
+  Papirus-Light.
+- Forces the light variant even when the desktop is in dark mode, so folders
   stay yellow
 
 ### 4. `nemo-icon`
@@ -116,6 +139,9 @@ updates files in place rather than duplicating them.
 - Appends a `GLOW START / END` block in `~/.config/gtk-4.0/gtk.css`
 - Same block in `~/.config/gtk-3.0/gtk.css`
 - Pre-existing user CSS in those files is preserved
+- Creates `~/.themes/<theme>-Glow/` and sets it as the GTK theme (also as the
+  Zorin day theme, when present)
+- State file in `~/.config/glow/theme-tweaks.state` (used by `--remove`)
 
 ### yellow-folders
 - `apt install papirus-icon-theme`
@@ -123,6 +149,8 @@ updates files in place rather than duplicating them.
 - Modifies small-size folder SVGs in
   `/usr/share/icons/Papirus{,-Light,-Dark}/<size>/places/` (full backup at
   `/usr/share/icons/_glow-colorize-backup/`)
+- Creates the `Papirus-Light-Glow` theme in
+  `~/.local/share/icons/Papirus-Light-Glow/`
 - Changes `gsettings` `icon-theme` on GNOME and Cinnamon schemas
 - State file in `~/.config/glow/yellow-folders.state` (used by `--remove`)
 
@@ -207,7 +235,8 @@ glow/
 ├── LICENSE                ← GPL-3.0-or-later
 ├── assets/
 │   ├── extension/         ← extension.js + metadata.json
-│   └── css/               ← gtk3.css + gtk4.css
+│   ├── css/               ← gtk3.css + gtk4.css
+│   └── icons/             ← build-theme.py (Papirus-Light-Glow)
 └── modules/
     ├── _lib.sh            ← shared logging helpers
     ├── focus-glow.sh
@@ -226,6 +255,7 @@ bash install.sh --remove
 Removes everything in reverse order:
 - Nemo override
 - Papirus icon backups restored
+- Papirus-Light-Glow theme deleted
 - Previous icon theme restored (read from state file)
 - CSS blocks removed (preserving any other user CSS)
 - GNOME Shell extension disabled and deleted

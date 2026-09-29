@@ -24,8 +24,13 @@ window.csd.background {
 
 /* ---------- Dodger Blue accent ---------- */
 
-@define-color theme_selected_bg_color   #1e90ff;
-@define-color theme_selected_fg_color   #ffffff;
+/* Apps that paint their own selection (Eclipse / SWT, for example)
+   ask GTK for these two named colors and need them opaque. #8fc8ff
+   is the glass selection (Dodger Blue at 50%) over white, so their
+   selection matches the one GTK draws. The theme itself does not
+   use these names. */
+@define-color theme_selected_bg_color   #8fc8ff;
+@define-color theme_selected_fg_color   @theme_fg_color;
 
 /* --- list / tree / grid / icon view selection --- */
 row:selected,
@@ -104,12 +109,26 @@ pathbar button.current-dir:backdrop label {
   color: #ffffff;
 }
 
-/* --- text selection --- */
+/* --- text selection: glass, lighter than rows so text stays readable --- */
 entry selection,
+entry selection:focus,
+entry selection:backdrop,
 textview selection,
-.entry selection {
-  background-color: #1e90ff;
-  color: #ffffff;
+textview selection:focus,
+textview selection:backdrop,
+.entry selection,
+label selection {
+  background-color: rgba(30, 144, 255, 0.35);
+  color: @theme_fg_color;
+}
+
+/* --- selected day in calendars --- */
+calendar:selected,
+calendar.view:selected,
+calendar:selected:backdrop {
+  background-color: rgba(30, 144, 255, 0.50);
+  border-radius: 6px;
+  color: @theme_fg_color;
 }
 
 /* --- checks, radios, switches --- */
@@ -139,10 +158,156 @@ button.suggested-action {
   color: #ffffff;
 }
 
-/* --- menu hover / active --- */
+/* --- menu hover / active: same glass as the selection --- */
 menuitem:hover,
 menuitem:active,
-.menu menuitem:hover {
-  background-color: #1e90ff;
-  color: #ffffff;
+.menu menuitem:hover,
+menubar > menuitem:hover {
+  background-color: rgba(30, 144, 255, 0.50);
+  background-image: none;
+  color: @theme_fg_color;
+}
+
+menuitem:hover label,
+menuitem:hover arrow,
+.menu menuitem:hover label,
+.menu menuitem:hover arrow,
+menubar > menuitem:hover label {
+  color: @theme_fg_color;
+}
+
+menuitem:hover accelerator,
+.menu menuitem:hover accelerator {
+  color: alpha(@theme_fg_color, 0.55);
+}
+
+/* ---------- glass selection ----------
+   Translucent, rounded selection with a gap between adjacent rows.
+   The transparent border makes the gap; background-clip keeps the
+   background inside the border, so border-radius rounds the visible
+   part. GTK has no backdrop-filter, so there is no blur. */
+
+treeview.view:selected,
+treeview.view:selected:focus,
+treeview.view:selected:hover,
+iconview:selected,
+iconview:selected:focus,
+iconview:selected:hover {
+  background-color: rgba(30, 144, 255, 0.50);
+  background-image: none;
+  background-clip: padding-box;
+  border-top: 2px solid transparent;
+  border-bottom: 2px solid transparent;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-radius: 6px;
+  color: @theme_fg_color;
+}
+
+/* The Nemo sidebar places several narrow cells side by side: a side
+   inset would split the selection into one segment per cell. */
+.nemo-places-sidebar treeview.view:selected,
+.nemo-places-sidebar treeview.view:selected:focus,
+.nemo-places-sidebar treeview.view:selected:hover {
+  border-left-width: 0;
+  border-right-width: 0;
+  border-radius: 4px;
+}
+
+/* Unfocused windows get the same glass selection: the solid
+   backdrop rule earlier in this file would otherwise win. */
+treeview.view:selected:backdrop,
+iconview:selected:backdrop {
+  background-color: rgba(30, 144, 255, 0.50);
+  background-image: none;
+  background-clip: padding-box;
+  border-top: 2px solid transparent;
+  border-bottom: 2px solid transparent;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-radius: 6px;
+  color: @theme_fg_color;
+}
+
+.nemo-places-sidebar treeview.view:selected:backdrop {
+  border-left-width: 0;
+  border-right-width: 0;
+  border-radius: 4px;
+}
+
+/* List box rows are real widgets: glass without the gap. */
+row:selected,
+row:selected:hover,
+row:selected:focus,
+row:selected:backdrop,
+.sidebar row:selected,
+.sidebar row:selected:backdrop,
+placessidebar row:selected,
+placessidebar row:selected:backdrop,
+flowbox flowboxchild:selected,
+flowbox flowboxchild:selected:backdrop {
+  background-color: rgba(30, 144, 255, 0.50);
+  background-image: none;
+  border-radius: 6px;
+  color: @theme_fg_color;
+}
+
+/* Checked buttons (view mode, sidebar toggle) and the current
+   directory in the path bar mark a selection too: same glass. */
+button:checked,
+button:checked:hover,
+button:checked:backdrop,
+button.toggle:checked,
+button.toggle:checked:backdrop,
+button.flat:checked,
+button.flat:checked:backdrop,
+togglebutton:checked,
+togglebutton:checked:backdrop,
+.linked > button:checked,
+.linked > button:checked:backdrop,
+headerbar button:checked,
+headerbar button:checked:backdrop,
+.titlebar button:checked,
+.titlebar button:checked:backdrop,
+.path-bar button:checked,
+.path-bar button:checked:backdrop,
+.path-bar button.current-dir,
+.path-bar button.current-dir:backdrop,
+NemoPathBar button:checked,
+NemoPathBar button:checked:backdrop,
+NemoPathBar button.current-dir,
+NemoPathBar button.current-dir:backdrop,
+pathbar button:checked,
+pathbar button:checked:backdrop,
+pathbar button.current-dir,
+pathbar button.current-dir:backdrop {
+  background-color: rgba(30, 144, 255, 0.50);
+  background-image: none;
+  border-radius: 6px;
+  color: @theme_fg_color;
+}
+
+button:checked:backdrop label,
+.path-bar button:checked:backdrop label,
+.path-bar button.current-dir:backdrop label,
+NemoPathBar button:checked:backdrop label,
+NemoPathBar button.current-dir:backdrop label,
+pathbar button:checked:backdrop label,
+pathbar button.current-dir:backdrop label {
+  color: @theme_fg_color;
+}
+
+/* Eclipse (SWT) asks GTK for the selection color of a generic
+   .view.cell node and paints it itself, opaque. Give that node the
+   glass selection as an opaque color (Dodger Blue at 50% over white),
+   so rows Eclipse paints match the rows GTK paints. */
+.view:selected,
+.view:selected:focus,
+.view:selected:backdrop,
+.view.cell:selected,
+.view.cell:selected:focus,
+.view.cell:selected:backdrop {
+  background-color: #8fc8ff;
+  background-image: none;
+  color: @theme_fg_color;
 }
