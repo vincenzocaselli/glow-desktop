@@ -6,14 +6,21 @@
 # dirs so that Nemo / Files show yellow folders in list view too
 # (not just at big zoom).
 #
-# Forces Papirus-Light always — yellow folders stay yellow even
-# when the desktop is in dark mode.
+# Builds Papirus-Light-Glow, a theme that inherits Papirus-Light
+# and replaces the monochrome sidebar icons of Nemo and Files
+# with color ones, then activates it.
+#
+# Forces the light variant always — yellow folders stay yellow
+# even when the desktop is in dark mode.
 # ============================================================
 
 set -euo pipefail
 
 STATE_FILE="$HOME/.config/glow/yellow-folders.state"
 COLORIZE_BACKUP="/usr/share/icons/_glow-colorize-backup"
+GLOW_THEME="Papirus-Light-Glow"
+GLOW_THEME_DIR="$HOME/.local/share/icons/$GLOW_THEME"
+BUILD_THEME="$(cd "$(dirname "${BASH_SOURCE[0]}")/../assets/icons" && pwd)/build-theme.py"
 
 source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 
@@ -107,7 +114,30 @@ restore_small_folders() {
     ok "Original icons restored"
 }
 
-activate_papirus_light() {
+# Falls back to plain Papirus-Light when the build fails, so the
+# module still leaves a working icon theme behind.
+build_glow_theme() {
+    info "Building $GLOW_THEME (color sidebar icons)..."
+    local count
+    if count=$(python3 "$BUILD_THEME" "$GLOW_THEME_DIR" /usr/share/icons/Papirus-Light/24x24); then
+        gtk-update-icon-cache -f "$GLOW_THEME_DIR" 2>/dev/null || true
+        ok "$GLOW_THEME built with $count icons in $GLOW_THEME_DIR"
+        ACTIVE_THEME="$GLOW_THEME"
+    else
+        warn "Could not build $GLOW_THEME (needs python3-gi); using Papirus-Light"
+        rm -rf "$GLOW_THEME_DIR"
+        ACTIVE_THEME="Papirus-Light"
+    fi
+}
+
+remove_glow_theme() {
+    if [[ -d "$GLOW_THEME_DIR" ]]; then
+        rm -rf "$GLOW_THEME_DIR"
+        ok "Removed $GLOW_THEME_DIR"
+    fi
+}
+
+activate_icon_theme() {
     mkdir -p "$(dirname "$STATE_FILE")"
 
     local gnome_cur cinn_cur
@@ -121,12 +151,12 @@ activate_papirus_light() {
         } > "$STATE_FILE"
     fi
 
-    # Activate Papirus-Light EVERYWHERE.
+    # Activate the theme EVERYWHERE.
     # Nautilus reads from the GNOME schema, Nemo reads from the Cinnamon schema.
-    gsettings set org.gnome.desktop.interface icon-theme 'Papirus-Light'
-    gsettings set org.cinnamon.desktop.interface icon-theme 'Papirus-Light' 2>/dev/null || true
-    gsettings set org.cinnamon.desktop.interface icon-theme-backup 'Papirus-Light' 2>/dev/null || true
-    ok "Icon theme set to Papirus-Light (GNOME + Cinnamon)"
+    gsettings set org.gnome.desktop.interface icon-theme "$ACTIVE_THEME"
+    gsettings set org.cinnamon.desktop.interface icon-theme "$ACTIVE_THEME" 2>/dev/null || true
+    gsettings set org.cinnamon.desktop.interface icon-theme-backup "$ACTIVE_THEME" 2>/dev/null || true
+    ok "Icon theme set to $ACTIVE_THEME (GNOME + Cinnamon)"
 }
 
 restore_previous_icon_theme() {
@@ -165,12 +195,14 @@ case "$cmd" in
         ensure_papirus_folders_installed
         apply_yellow_color
         colorize_small_folders
-        activate_papirus_light
+        build_glow_theme
+        activate_icon_theme
         ;;
     remove)
         step "yellow-folders: reverting"
         restore_small_folders
         restore_previous_icon_theme
+        remove_glow_theme
         info "Papirus package left installed. To fully remove: ${DIM}sudo apt remove papirus-icon-theme${NC}"
         ;;
     *)
