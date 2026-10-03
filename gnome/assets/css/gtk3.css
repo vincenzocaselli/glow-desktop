@@ -311,3 +311,17 @@ pathbar button.current-dir:backdrop label {
   background-image: none;
   color: @theme_fg_color;
 }
+
+/* ---------- light blue title bar on the focused window ----------
+   Same color as in GTK4: Dodger Blue at 25% over white. Unfocused
+   windows keep a white title bar. */
+.titlebar:not(headerbar),
+headerbar {
+  background-color: #c7e3ff;
+  background-image: none;
+}
+.titlebar:backdrop:not(headerbar),
+headerbar:backdrop {
+  background-color: #ffffff;
+  background-image: none;
+}

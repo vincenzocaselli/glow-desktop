@@ -43,6 +43,10 @@ GTK3 + GTK4 CSS overrides:
   from the GTK theme file, not from `gtk.css`. The module activates
   `<theme>-Glow`, a theme that imports the current one and only replaces the
   selection colors with the opaque equivalent of the glass (`#8fc8ff`)
+- **Light blue title bar** — the focused window's title bar is light blue
+  (`#c7e3ff`, Dodger Blue at 25% over white), the others stay white. Covers
+  GTK3, GTK4, and the title bars the window manager draws for apps such as
+  Nemo and Eclipse; those update after logging out and back in
 - **Light gray dividers (GTK4)** — thin `#dedede` lines below the title bars,
   between the sidebar and the content, and between list column headers, so
   the areas stay distinct on white

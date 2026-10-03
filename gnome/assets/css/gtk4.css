@@ -287,3 +287,20 @@ columnview > header > button {
   border-left: 1px solid @glow_divider_color;
   box-shadow: none;
 }
+
+/* ---------- light blue title bar on the focused window ----------
+   Dodger Blue at 25% over white: light enough that checked buttons
+   in the title bar (glass at 50%) still stand out. Unfocused windows
+   keep a white title bar, so the focused one is easy to spot.
+   libadwaita draws the top bar of a toolbar view transparent over
+   the window background, so it needs its own background. */
+@define-color glow_titlebar_color                 #c7e3ff;
+@define-color headerbar_bg_color                  @glow_titlebar_color;
+@define-color headerbar_backdrop_color            #ffffff;
+
+toolbarview > .top-bar {
+  background-color: @headerbar_bg_color;
+}
+toolbarview > .top-bar:backdrop {
+  background-color: @headerbar_backdrop_color;
+}
