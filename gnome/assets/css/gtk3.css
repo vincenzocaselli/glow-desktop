@@ -325,3 +325,70 @@ headerbar:backdrop {
   background-color: #ffffff;
   background-image: none;
 }
+
+/* ---------- window buttons in the style of Windows 11 ----------
+   Same look as in GTK4: wide flat buttons with thin line icons, a
+   light gray hover, a red close button on hover. The icons live in
+   glow/ next to this file. :not(.appmenu) outranks the theme's round
+   title buttons. */
+headerbar button.titlebutton:not(.appmenu),
+.titlebar button.titlebutton:not(.appmenu) {
+  min-width: 46px;
+  min-height: 32px;
+  padding: 0;
+  margin: 0;
+  border: none;
+  border-radius: 4px;
+  background-color: transparent;
+  box-shadow: none;
+  -gtk-icon-shadow: none;
+  transition: background-color 150ms ease-out, color 150ms ease-out;
+}
+
+headerbar button.titlebutton:not(.appmenu):hover,
+.titlebar button.titlebutton:not(.appmenu):hover {
+  background-color: alpha(currentColor, 0.08);
+}
+headerbar button.titlebutton:not(.appmenu):active,
+.titlebar button.titlebutton:not(.appmenu):active {
+  background-color: alpha(currentColor, 0.14);
+}
+headerbar button.titlebutton.close:hover,
+.titlebar button.titlebutton.close:hover {
+  background-color: #d13438;
+  color: #ffffff;
+}
+headerbar button.titlebutton.close:active,
+.titlebar button.titlebutton.close:active {
+  background-color: #b52a30;
+  color: #ffffff;
+}
+
+/* GTK ignores -gtk-icon-source on an image that has its own icon
+   name, so the icon is drawn as the button background, recolored with
+   the text color, and the original image is hidden. */
+button.titlebutton:not(.appmenu) image {
+  opacity: 0;
+}
+headerbar button.titlebutton:not(.appmenu),
+.titlebar button.titlebutton:not(.appmenu) {
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 16px 16px;
+}
+headerbar button.titlebutton.minimize,
+.titlebar button.titlebutton.minimize {
+  background-image: -gtk-recolor(url("glow/window-minimize-symbolic.svg"));
+}
+headerbar button.titlebutton.maximize,
+.titlebar button.titlebutton.maximize {
+  background-image: -gtk-recolor(url("glow/window-maximize-symbolic.svg"));
+}
+.maximized headerbar button.titlebutton.maximize,
+.maximized .titlebar button.titlebutton.maximize {
+  background-image: -gtk-recolor(url("glow/window-restore-symbolic.svg"));
+}
+headerbar button.titlebutton.close,
+.titlebar button.titlebutton.close {
+  background-image: -gtk-recolor(url("glow/window-close-symbolic.svg"));
+}

@@ -47,6 +47,10 @@ GTK3 + GTK4 CSS overrides:
   (`#c7e3ff`, Dodger Blue at 25% over white), the others stay white. Covers
   GTK3, GTK4, and the title bars the window manager draws for apps such as
   Nemo and Eclipse; those update after logging out and back in
+- **Window buttons in the style of Windows 11** — minimize, maximize, and
+  close become wide flat buttons with thin line icons, a light gray hover,
+  and a red close button on hover. Similar to Windows 11, not a copy: the
+  icons are drawn for Glow and the buttons keep slightly rounded corners
 - **Light gray dividers (GTK4)** — thin `#dedede` lines below the title bars,
   between the sidebar and the content, and between list column headers, so
   the areas stay distinct on white
@@ -143,6 +147,7 @@ updates files in place rather than duplicating them.
 - Appends a `GLOW START / END` block in `~/.config/gtk-4.0/gtk.css`
 - Same block in `~/.config/gtk-3.0/gtk.css`
 - Pre-existing user CSS in those files is preserved
+- Copies the window button icons to `~/.config/gtk-{3,4}.0/glow/`
 - Creates `~/.themes/<theme>-Glow/` and sets it as the GTK theme (also as the
   Zorin day theme, when present)
 - State file in `~/.config/glow/theme-tweaks.state` (used by `--remove`)
@@ -240,6 +245,7 @@ glow/
 ├── assets/
 │   ├── extension/         ← extension.js + metadata.json
 │   ├── css/               ← gtk3.css + gtk4.css
+│   ├── titlebuttons/      ← window button icons (minimize, maximize, restore, close)
 │   └── icons/             ← build-theme.py (Papirus-Light-Glow)
 └── modules/
     ├── _lib.sh            ← shared logging helpers

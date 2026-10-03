@@ -304,3 +304,74 @@ toolbarview > .top-bar {
 toolbarview > .top-bar:backdrop {
   background-color: @headerbar_backdrop_color;
 }
+
+/* ---------- window buttons in the style of Windows 11 ----------
+   Wide flat buttons with thin line icons instead of round ones: a
+   light gray hover, a red close button on hover. The icons live in
+   glow/ next to this file and follow the text color. libadwaita draws
+   a circle behind each icon; it goes away. */
+windowcontrols {
+  border-spacing: 0;
+}
+
+windowcontrols > button,
+headerbar.default-decoration windowcontrols > button {
+  min-width: 46px;
+  min-height: 32px;
+  padding: 0;
+  margin: 0;
+  border-radius: 4px;
+  background-color: transparent;
+  box-shadow: none;
+  transition: background-color 150ms ease-out, color 150ms ease-out;
+}
+
+windowcontrols > button > image,
+windowcontrols > button:hover > image,
+windowcontrols > button:active > image {
+  background: none;
+  box-shadow: none;
+  padding: 0;
+  -gtk-icon-size: 16px;
+}
+
+windowcontrols > button:hover {
+  background-color: alpha(currentColor, 0.08);
+}
+windowcontrols > button:active {
+  background-color: alpha(currentColor, 0.14);
+}
+windowcontrols > button.close:hover {
+  background-color: #d13438;
+  color: #ffffff;
+}
+windowcontrols > button.close:active {
+  background-color: #b52a30;
+  color: #ffffff;
+}
+
+/* GTK ignores -gtk-icon-source on an image that has its own icon
+   name, so the icon is drawn as the button background, recolored with
+   the text color, and the original image is hidden. */
+windowcontrols > button > image {
+  opacity: 0;
+}
+windowcontrols > button.minimize,
+windowcontrols > button.maximize,
+windowcontrols > button.close {
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 16px 16px;
+}
+windowcontrols > button.minimize {
+  background-image: -gtk-recolor(url("glow/window-minimize-symbolic.svg"));
+}
+windowcontrols > button.maximize {
+  background-image: -gtk-recolor(url("glow/window-maximize-symbolic.svg"));
+}
+window.maximized windowcontrols > button.maximize {
+  background-image: -gtk-recolor(url("glow/window-restore-symbolic.svg"));
+}
+windowcontrols > button.close {
+  background-image: -gtk-recolor(url("glow/window-close-symbolic.svg"));
+}

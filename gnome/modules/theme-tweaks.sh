@@ -21,6 +21,9 @@ GTK3_FILE="$GTK3_DIR/gtk.css"
 SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../assets/css" && pwd)"
 GTK4_SRC="$SRC_DIR/gtk4.css"
 GTK3_SRC="$SRC_DIR/gtk3.css"
+# Window button icons, referenced by the CSS as glow/<name>.svg
+ICONS_SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/../assets/titlebuttons" && pwd)"
+ICONS_SUBDIR="glow"
 
 STATE_FILE="$HOME/.config/glow/theme-tweaks.state"
 GLOW_SUFFIX="-Glow"
@@ -167,6 +170,19 @@ remove_derived_theme() {
     ok "GTK theme restored to ${prev_gtk:-default}"
 }
 
+install_icons() {
+    local dir
+    for dir in "$GTK4_DIR" "$GTK3_DIR"; do
+        rm -rf "${dir:?}/$ICONS_SUBDIR"
+        mkdir -p "$dir/$ICONS_SUBDIR"
+        cp "$ICONS_SRC"/*.svg "$dir/$ICONS_SUBDIR/"
+    done
+}
+
+remove_icons() {
+    rm -rf "${GTK4_DIR:?}/$ICONS_SUBDIR" "${GTK3_DIR:?}/$ICONS_SUBDIR"
+}
+
 cmd="${1:-install}"
 
 case "$cmd" in
@@ -176,6 +192,8 @@ case "$cmd" in
         ok "GTK4 → $GTK4_FILE"
         append_block "$GTK3_FILE" "$GTK3_SRC"
         ok "GTK3 → $GTK3_FILE"
+        install_icons
+        ok "Window button icons → $GTK4_DIR/$ICONS_SUBDIR, $GTK3_DIR/$ICONS_SUBDIR"
         install_derived_theme
         ;;
     remove)
@@ -184,6 +202,7 @@ case "$cmd" in
         ok "Cleaned $GTK4_FILE"
         remove_block "$GTK3_FILE"
         ok "Cleaned $GTK3_FILE"
+        remove_icons
         remove_derived_theme
         ;;
     *)
