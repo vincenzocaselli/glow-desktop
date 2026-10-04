@@ -1,9 +1,9 @@
 {
     "uuid": "glow@nebula.local",
     "name": "Glow",
-    "description": "Draws a soft colored aura around the currently focused window. Works with any application — GTK, Electron, Qt, SWT — because it runs at the compositor level. Color, blur, and thickness are configurable in extension.js.",
+    "description": "Draws a soft colored aura around the currently focused window. Works with any application — GTK, Electron, Qt, SWT — because it runs at the compositor level. On laptops it also shows a battery icon in the style of Windows 11 and the remaining time on hover. Everything is configurable in extension.js.",
     "shell-version": ["45", "46", "47", "48", "49", "50", "51", "52"],
     "url": "https://github.com/vincenzocaselli/glow-desktop",
-    "version": 4,
-    "version-name": "1.0.5"
+    "version": 5,
+    "version-name": "1.0.6"
 }
