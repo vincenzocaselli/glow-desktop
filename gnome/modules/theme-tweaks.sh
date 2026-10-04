@@ -9,6 +9,9 @@
 # one and changes only its selection colors. Toolkits that read the
 # theme file instead of gtk.css (Eclipse / SWT) then paint the same
 # glass selection as GTK apps.
+#
+# On Zorin OS it also lowers the taskbar to 42px, so more pinned
+# apps fit; --remove restores the previous height.
 # ============================================================
 
 set -euo pipefail
@@ -183,6 +186,38 @@ remove_icons() {
     rm -rf "${GTK4_DIR:?}/$ICONS_SUBDIR" "${GTK3_DIR:?}/$ICONS_SUBDIR"
 }
 
+# Zorin's taskbar derives the app icon size from the panel height:
+# 42px gives 26px icons and fits more pinned apps than the default 48.
+TASKBAR_SCHEMA="org.gnome.shell.extensions.zorin-taskbar"
+TASKBAR_SIZE=42
+TASKBAR_STATE="$HOME/.config/glow/taskbar.state"
+
+has_zorin_taskbar() {
+    gsettings list-schemas 2>/dev/null | grep -qx "$TASKBAR_SCHEMA"
+}
+
+install_taskbar_size() {
+    if ! has_zorin_taskbar; then
+        info "Zorin taskbar not found; panel size unchanged"
+        return 0
+    fi
+    if [[ ! -f "$TASKBAR_STATE" ]]; then
+        mkdir -p "$(dirname "$TASKBAR_STATE")"
+        gsettings get "$TASKBAR_SCHEMA" panel-size > "$TASKBAR_STATE"
+    fi
+    gsettings set "$TASKBAR_SCHEMA" panel-size "$TASKBAR_SIZE"
+    ok "Zorin taskbar → ${TASKBAR_SIZE}px"
+}
+
+remove_taskbar_size() {
+    [[ -f "$TASKBAR_STATE" ]] || return 0
+    if has_zorin_taskbar; then
+        gsettings set "$TASKBAR_SCHEMA" panel-size "$(cat "$TASKBAR_STATE")"
+        ok "Zorin taskbar restored to $(cat "$TASKBAR_STATE")px"
+    fi
+    rm -f "$TASKBAR_STATE"
+}
+
 cmd="${1:-install}"
 
 case "$cmd" in
@@ -195,6 +230,7 @@ case "$cmd" in
         install_icons
         ok "Window button icons → $GTK4_DIR/$ICONS_SUBDIR, $GTK3_DIR/$ICONS_SUBDIR"
         install_derived_theme
+        install_taskbar_size
         ;;
     remove)
         step "theme-tweaks: removing CSS overrides"
@@ -204,6 +240,7 @@ case "$cmd" in
         ok "Cleaned $GTK3_FILE"
         remove_icons
         remove_derived_theme
+        remove_taskbar_size
         ;;
     *)
         err "Unknown command: $cmd"
