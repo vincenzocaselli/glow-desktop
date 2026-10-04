@@ -42,6 +42,9 @@ One visual identity, applied consistently across the whole desktop:
   at small sizes in list view (where Papirus normally falls back to
   monochrome symbolic icons).
 - **Compact file manager zoom** — content font size matching the sidebar.
+- **Top bar in the style of Windows 11** *(GNOME)* — a horizontal battery
+  icon with a colored fill and the percentage inside, the remaining time on
+  hover, and Wi-Fi and volume icons drawn to match.
 
 Everything is **modular** (install only what you like), **idempotent**
 (safe to re-run) and **fully reversible** (`--remove` puts you back exactly
@@ -81,6 +84,9 @@ GNOME Shell).
 | Square corners | `theme-tweaks` | `square-corners` |
 | Yellow folders | `yellow-folders` | `yellow-folders` |
 | File manager icon + zoom | `nemo-icon`, `nemo-zoom` | `dolphin` |
+| Battery icon + remaining time | `focus-glow` | *(native)* |
+| Wi-Fi and volume icons | `yellow-folders` (icon theme) | — |
+| Compact taskbar (Zorin) | `theme-tweaks` | — |
 | Super → Overview | *(native)* | `overview` |
 
 ## Requirements

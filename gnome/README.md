@@ -22,6 +22,18 @@ compositor level.
 - Opacity: 0.95
 - Fully configurable in `extension.js` (no repackage needed)
 
+On laptops the same extension also restyles the battery in the top bar:
+
+- **Battery icon in the style of Windows 11** — horizontal, with a fill
+  proportional to the charge: green, amber at 20% and below, red at 10% and
+  below. The percentage is written inside, white on the fill and in the
+  panel's text color on the empty part. A bolt appears when the charger is
+  plugged in
+- **Remaining time on hover** — resting the pointer on the battery icon shows
+  the remaining time on battery, or the time to a full charge. In Italian on
+  an Italian system, in English otherwise
+- On machines without a battery, nothing changes
+
 ### 2. `theme-tweaks`
 GTK3 + GTK4 CSS overrides:
 
@@ -56,6 +68,8 @@ GTK3 + GTK4 CSS overrides:
   the areas stay distinct on white
 - **Sidebar icons at full strength (GTK4)** — the theme dims sidebar icons to
   70%, which washes out the color icons of `yellow-folders`
+- **Compact taskbar (Zorin OS)** — lowers the Zorin taskbar from 48 to 42px.
+  The taskbar sizes the app icons from its height, so more pinned apps fit
 
 Applied as a marked block (`GLOW START / END`) inside `~/.config/gtk-{3,4}.0/gtk.css`.
 Existing user CSS is preserved.
@@ -75,6 +89,10 @@ Installs the **Papirus** icon theme with yellow folders.
   Files (folders, trash, drives) with color ones. Dialog icons stay monochrome.
   The theme needs `python3-gi`: without it, the module falls back to
   Papirus-Light.
+- **Wi-Fi and volume icons in the style of Windows 11** — the same theme
+  replaces the top bar's Wi-Fi icons (a fan of arcs, with the levels not
+  reached shown faint) and volume icons (a speaker with one to three waves,
+  a cross when muted). They are symbolic, so they take the panel's text color
 - Forces the light variant even when the desktop is in dark mode, so folders
   stay yellow
 
@@ -151,6 +169,8 @@ updates files in place rather than duplicating them.
 - Creates `~/.themes/<theme>-Glow/` and sets it as the GTK theme (also as the
   Zorin day theme, when present)
 - State file in `~/.config/glow/theme-tweaks.state` (used by `--remove`)
+- On Zorin OS, sets `org.gnome.shell.extensions.zorin-taskbar panel-size` to
+  42; the previous value is saved in `~/.config/glow/taskbar.state`
 
 ### yellow-folders
 - `apt install papirus-icon-theme`
@@ -190,6 +210,13 @@ const CFG = {
     stripWidth: 2,
     fadeMs: 180,
     followMove: true,
+    // ...
+    batteryTooltip: true,        // remaining time on hover
+    batteryIcon: true,           // false: keep the stock battery icon
+    batteryPercentInside: true,
+    batteryFont: 'Inter SemiBold',
+    batteryIconWidth: 30,
+    batteryIconHeight: 15,
 };
 ```
 
