@@ -42,9 +42,16 @@ ICONS = {
         "folder-open", "folder-pictures", "folder-publicshare",
         "folder-templates", "folder-videos", "network-workgroup",
         "user-desktop", "user-home", "user-trash", "user-trash-full",
+        "xapp-user-favorites",
     ],
     "status": ["folder-open", "starred", "user-trash-full"],
 }
+
+# Names drawn from a Papirus icon with a different name. Nemo shows
+# Favorites with xapp-user-favorites-symbolic, which Papirus lacks, so
+# it falls back to a dark hicolor star; the yellow Papirus bookmark
+# star matches the yellow folders.
+SOURCE_NAMES = {"xapp-user-favorites": "user-bookmarks"}
 
 INDEX_HEAD = """[Icon Theme]
 Name=Papirus-Light-Glow
@@ -193,7 +200,7 @@ def main(dest, src):
         out_dir = os.path.join(dest, "symbolic", ctx)
         os.makedirs(out_dir)
         for name in names:
-            path = find_source(src, ctx, name)
+            path = find_source(src, ctx, SOURCE_NAMES.get(name, name))
             if path is None:
                 print(f"skipped {name}: no source icon", file=sys.stderr)
                 continue
