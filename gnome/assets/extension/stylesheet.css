@@ -1,0 +1,29 @@
+/* Glow — tighter top bar and taskbar tray.
+   The theme gives each panel button 9px of padding per side on top of
+   a 4px transparent border, so tray icons sit about 36px apart. 3px of
+   padding and a 1px side border bring them to about 24px; the hover
+   pill still surrounds each icon. Zorin's tray in compact mode sets its
+   own inline padding, which wins over this: theme-tweaks turns that
+   mode off. Quick settings icons (Wi-Fi, Bluetooth, volume) share one
+   button: their own spacing goes from 4px to 2px. */
+
+#panel .panel-button,
+.zorintaskbarMainPanel .panel-button {
+  -natural-hpadding: 3px;
+  -minimum-hpadding: 1px;
+  border-left-width: 1px;
+  border-right-width: 1px;
+}
+
+#panel .panel-button .panel-status-indicators-box,
+.zorintaskbarMainPanel .panel-button .panel-status-indicators-box {
+  spacing: 2px;
+}
+
+/* The theme also wraps each tray icon in 6px of padding and 4px of
+   margin per side. */
+#panel .panel-button .system-status-icon,
+.zorintaskbarMainPanel .panel-button .system-status-icon {
+  padding: 0 1px;
+  margin: 0 1px;
+}

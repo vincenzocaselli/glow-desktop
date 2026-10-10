@@ -31,6 +31,10 @@ and mouse are idle, then minimizes it again (`warmMinimized` in `extension.js`).
 The Bluetooth indicator in the top bar is drawn in Dodger Blue
 (`bluetoothColor` in `extension.js`; `null` keeps the panel's text color).
 
+A small stylesheet tightens the tray: icons sit about 24px apart instead of
+36px. On Zorin it turns off the tray's compact mode, whose inline padding
+would override the stylesheet; `--remove` restores the previous setting.
+
 A compact free-space indicator shows the free gigabytes of `/` (for example
 `33 GB`) in a small box filled in light blue in proportion to the space used:
 amber below 15% free, red below 7%. On laptops it sits next to the battery,
