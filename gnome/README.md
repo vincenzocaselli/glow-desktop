@@ -22,6 +22,12 @@ compositor level.
 - Opacity: 0.95
 - Fully configurable in `extension.js` (no repackage needed)
 
+The extension also fills in overview previews for windows created minimized.
+A browser that restores its session at login creates its windows already
+minimized and never draws them, so the overview showed them empty. Glow shows
+each one for a moment at zero opacity, without animations, while the keyboard
+and mouse are idle, then minimizes it again (`warmMinimized` in `extension.js`).
+
 The Bluetooth indicator in the top bar is drawn in Dodger Blue
 (`bluetoothColor` in `extension.js`; `null` keeps the panel's text color).
 

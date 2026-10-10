@@ -15,6 +15,7 @@ import Cairo from 'cairo';
 import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
+import Meta from 'gi://Meta';
 import Pango from 'gi://Pango';
 import PangoCairo from 'gi://PangoCairo';
 import St from 'gi://St';
@@ -113,6 +114,17 @@ const CFG = {
     // to keep the panel's text color.
     bluetoothColor: [30, 144, 255],
 
+    // Overview previews for windows created minimized. A browser that
+    // restores its session at login creates its windows already
+    // minimized and never draws them, so the overview shows them empty.
+    // Glow shows each one invisibly for a moment, then minimizes it again.
+    warmMinimized: true,
+    // Quiet time after the last new window before warming starts.
+    warmSettleMs: 5000,
+    // Warm a window only after this much keyboard and mouse inactivity.
+    warmIdleMs: 3000,
+    // How long a window stays shown, invisibly, to draw its content.
+    warmShowMs: 800,
 };
 
 // -------------------- FrameGlow --------------------
@@ -818,6 +830,137 @@ class DiskSpace {
     }
 }
 
+// -------------------- PreviewWarmer --------------------
+// The overview shows a clone of each window's content. A window that
+// was minimized before its application ever drew it has no content,
+// so its preview stays empty until the user opens it once. This
+// shows such windows one at a time, at zero opacity and without the
+// minimize animations, then minimizes them again.
+class PreviewWarmer {
+    constructor() {
+        this._queue = [];
+        this._settleId = 0;
+        this._stepId = 0;
+        this._warming = null;
+        this._createdId = global.display.connect('window-created',
+            (_display, win) => this._onWindowCreated(win));
+
+        // Windows that already exist when the extension starts.
+        global.get_window_actors()
+            .map(actor => actor.meta_window)
+            .forEach(win => this._enqueue(win));
+        this._scheduleSettle();
+    }
+
+    _onWindowCreated(win) {
+        this._enqueue(win);
+        this._scheduleSettle();
+    }
+
+    _enqueue(win) {
+        if (win && !this._queue.includes(win))
+            this._queue.push(win);
+    }
+
+    // Start only once windows stop appearing: a session restore maps
+    // them in a burst, and minimizes them right after creating them.
+    _scheduleSettle() {
+        if (this._settleId)
+            GLib.Source.remove(this._settleId);
+        this._settleId = GLib.timeout_add(GLib.PRIORITY_DEFAULT,
+            CFG.warmSettleMs, () => {
+                this._settleId = 0;
+                this._next();
+                return GLib.SOURCE_REMOVE;
+            });
+    }
+
+    _needsWarming(win) {
+        if (!win.minimized || win.skip_taskbar || win.is_override_redirect())
+            return false;
+        if (win.get_window_type() !== Meta.WindowType.NORMAL)
+            return false;
+        // Windows on other workspaces are not drawn even when shown.
+        const ws = global.workspace_manager.get_active_workspace();
+        return win.located_on_workspace(ws) && !!win.get_compositor_private();
+    }
+
+    _next() {
+        if (this._stepId || this._warming)
+            return;
+
+        while (this._queue.length && !this._needsWarming(this._queue[0]))
+            this._queue.shift();
+        if (!this._queue.length)
+            return;
+
+        // Wait for the user to pause: a window shown invisibly could
+        // otherwise receive a click meant for what lies beneath it.
+        const idle = global.backend.get_core_idle_monitor().get_idletime();
+        const wait = idle >= CFG.warmIdleMs ? 0 : CFG.warmIdleMs - idle;
+        this._stepId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, Math.max(wait, 100), () => {
+            this._stepId = 0;
+            if (global.backend.get_core_idle_monitor().get_idletime() < CFG.warmIdleMs) {
+                this._next();
+                return GLib.SOURCE_REMOVE;
+            }
+            this._warm(this._queue.shift());
+            return GLib.SOURCE_REMOVE;
+        });
+    }
+
+    _warm(win) {
+        if (!win || !this._needsWarming(win)) {
+            this._next();
+            return;
+        }
+        const actor = win.get_compositor_private();
+        const focused = global.display.focus_window;
+
+        this._warming = {win, actor, focused};
+        actor.opacity = 0;
+        Main.wm.skipNextEffect(actor);
+        win.unminimize();
+
+        this._stepId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, CFG.warmShowMs, () => {
+            this._stepId = 0;
+            this._finish();
+            this._next();
+            return GLib.SOURCE_REMOVE;
+        });
+    }
+
+    _finish() {
+        const w = this._warming;
+        this._warming = null;
+        if (!w)
+            return;
+        try {
+            if (!w.win.minimized) {
+                Main.wm.skipNextEffect(w.actor);
+                w.win.minimize();
+            }
+            w.actor.opacity = 255;
+            // Showing a window for the first time can hand it the focus.
+            if (w.focused && global.display.focus_window !== w.focused)
+                w.focused.focus(global.get_current_time());
+        } catch (e) {
+            // The window closed while it was shown: nothing to restore.
+        }
+    }
+
+    destroy() {
+        global.display.disconnect(this._createdId);
+        if (this._settleId)
+            GLib.Source.remove(this._settleId);
+        if (this._stepId)
+            GLib.Source.remove(this._stepId);
+        this._settleId = this._stepId = 0;
+        this._finish();
+        this._queue = [];
+    }
+}
+
 // -------------------- Extension --------------------
 export default class Glow extends Extension {
     enable() {
@@ -850,6 +993,15 @@ export default class Glow extends Extension {
         if (CFG.bluetoothColor)
             this._tintBluetooth(0);
 
+        if (CFG.warmMinimized) {
+            try {
+                this._warmer = new PreviewWarmer();
+            } catch (e) {
+                console.warn(`Glow: overview preview warming disabled: ${e.message}`);
+                this._warmer = null;
+            }
+        }
+
         this._focusHandlerId = global.display.connect(
             'notify::focus-window',
             () => this._onFocusChanged()
@@ -878,6 +1030,8 @@ export default class Glow extends Extension {
         this._currentWindow = null;
         this._battery?.destroy();
         this._battery = null;
+        this._warmer?.destroy();
+        this._warmer = null;
         this._disk?.destroy();
         this._disk = null;
         if (this._tintId)
