@@ -151,6 +151,14 @@ def volume(level):
 
 SLASH = bar(8, 8, 17, 1.4, 45)
 
+# Eject: a triangle with rounded corners above a bar with round ends.
+EJECT = svg(
+    # Aligned to the 16px grid: whole-pixel base and a 2px bar stay sharp.
+    path("M7.2,3.1 Q8,2.2 8.8,3.1 L13.3,8.1 Q14,9 12.8,9 "
+         "H3.2 Q2,9 2.7,8.1 Z"),
+    '<rect x="2" y="11" width="12" height="2" rx="1"/>',
+)
+
 STATUS_ICONS = {
     "network-wireless-signal-excellent-symbolic": wifi(4),
     "network-wireless-signal-good-symbolic": wifi(3),
@@ -171,6 +179,7 @@ STATUS_ICONS = {
     "audio-volume-medium-symbolic": volume(2),
     "audio-volume-high-symbolic": volume(3),
     "audio-volume-overamplified-symbolic": volume(3),
+    "media-eject-symbolic": EJECT,
 }
 
 
@@ -181,6 +190,74 @@ def write_status_icons(dest):
         with open(os.path.join(out_dir, name + ".svg"), "w") as f:
             f.write(content)
     return len(STATUS_ICONS)
+
+
+# Insync's tray icons, drawn here: the Insync glyph (two arcs and an
+# "i") in the Dodger Blue of the focus glow, and a status badge at the
+# bottom left whose color tells the state at a glance. They are color
+# icons, not symbolic ones, so the panel does not recolor them.
+INSYNC_BLUE = "#1e90ff"
+INSYNC_GLYPH = (
+    f'<path d="M7 14a10 10 0 0 1 10-10" fill="none" stroke="{INSYNC_BLUE}" stroke-width="2"/>'
+    f'<path d="M11 14a6 6 0 0 1 6-6" fill="none" stroke="{INSYNC_BLUE}" stroke-width="2"/>'
+    f'<rect x="14" y="15" width="3" height="4" fill="{INSYNC_BLUE}"/>'
+    f'<circle cx="15.5" cy="12.5" r="1.5" fill="{INSYNC_BLUE}"/>'
+)
+_W = 'fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"'
+INSYNC_BADGES = {
+    # name: (badge color, white glyph drawn inside a circle at (5.5, 16.5))
+    "insync-synced": ("#22a35a", f'<path d="M3.3 16.6l1.5 1.5 3-3.2" {_W}/>'),
+    "insync-syncing": ("#1e90ff",
+                       f'<path d="M7.6 15.3a2.4 2.4 0 1 0 .2 2.2" {_W}/>'
+                       '<path d="M8.4 13.6v2.1h-2.1z" fill="#fff"/>'),
+    "insync-paused": ("#e0a000", '<rect x="3.9" y="14.4" width="1.2" height="4.2" fill="#fff"/>'
+                                  '<rect x="5.9" y="14.4" width="1.2" height="4.2" fill="#fff"/>'),
+    "insync-offline": ("#8a8f98", f'<path d="M4 15l3 3M7 15l-3 3" {_W}/>'),
+    "insync-error": ("#e5484d", '<rect x="4.85" y="13.9" width="1.3" height="3.2" rx="0.6" fill="#fff"/>'
+                                '<circle cx="5.5" cy="18.6" r="0.75" fill="#fff"/>'),
+    "insync-normal": (None, ""),
+}
+INSYNC_BADGES["insync-alert"] = INSYNC_BADGES["insync-error"]
+
+
+def insync_svg(color, glyph):
+    badge = ""
+    if color:
+        badge = (f'<circle cx="5.5" cy="16.5" r="5.5" fill="#fff"/>'
+                 f'<circle cx="5.5" cy="16.5" r="4.5" fill="{color}"/>{glyph}')
+    return ('<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" '
+            f'viewBox="0 0 22 22">{INSYNC_GLYPH}{badge}</svg>\n')
+
+
+# CopyQ's tray icon: CopyQ looks up "copyq-normal" in the icon theme
+# before falling back to its built-in scissors. A blue clipboard.
+COPYQ_SVG = (
+    '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22">'
+    '<rect x="3.5" y="3.5" width="15" height="17" rx="2.5" fill="#1e90ff"/>'
+    '<rect x="6" y="6.5" width="10" height="11.5" rx="1" fill="#fff"/>'
+    '<rect x="7.5" y="1.5" width="7" height="4" rx="1.5" fill="#123354"/>'
+    '<rect x="8" y="9.5" width="6" height="1.4" rx=".7" fill="#1e90ff"/>'
+    '<rect x="8" y="12.3" width="6" height="1.4" rx=".7" fill="#8fc8ff"/>'
+    '<rect x="8" y="15.1" width="4" height="1.4" rx=".7" fill="#8fc8ff"/>'
+    '</svg>\n'
+)
+
+
+def write_app_tray_icons(dest):
+    out_dir = os.path.join(dest, "symbolic", "status")
+    os.makedirs(out_dir, exist_ok=True)
+    with open(os.path.join(out_dir, "copyq-normal.svg"), "w") as f:
+        f.write(COPYQ_SVG)
+    return 1
+
+
+def write_insync_icons(dest, src):
+    out_dir = os.path.join(dest, "symbolic", "status")
+    os.makedirs(out_dir, exist_ok=True)
+    for name, (color, glyph) in INSYNC_BADGES.items():
+        with open(os.path.join(out_dir, name + ".svg"), "w") as f:
+            f.write(insync_svg(color, glyph))
+    return len(INSYNC_BADGES)
 
 
 def find_source(src, ctx, name):
@@ -209,6 +286,8 @@ def main(dest, src):
             written += 1
 
     written += write_status_icons(dest)
+    written += write_insync_icons(dest, src)
+    written += write_app_tray_icons(dest)
 
     dirs = [f"symbolic/{ctx}" for ctx in ICONS]
     with open(os.path.join(dest, "index.theme"), "w") as f:

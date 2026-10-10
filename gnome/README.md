@@ -22,6 +22,9 @@ compositor level.
 - Opacity: 0.95
 - Fully configurable in `extension.js` (no repackage needed)
 
+The Bluetooth indicator in the top bar is drawn in Dodger Blue
+(`bluetoothColor` in `extension.js`; `null` keeps the panel's text color).
+
 A compact free-space indicator shows the free gigabytes of `/` (for example
 `33 GB`) in a small box filled in light blue in proportion to the space used:
 amber below 15% free, red below 7%. On laptops it sits next to the battery,
@@ -98,6 +101,13 @@ Installs the **Papirus** icon theme with yellow folders.
   Files (folders, trash, drives) with color ones. Dialog icons stay monochrome.
   The theme needs `python3-gi`: without it, the module falls back to
   Papirus-Light.
+- **Favorites star** — Nemo's Favorites gets the yellow Papirus bookmark star
+  instead of a dark one
+- **Tray icons** — a cleaner eject icon (rounded triangle and bar, sharp at
+  16px); a blue clipboard for CopyQ instead of its scissors; Insync's icon in
+  Dodger Blue with a status badge at the bottom left: green check when
+  synced, blue arrow while syncing, amber bars when paused, gray cross when
+  offline, red "!" on errors
 - **Wi-Fi and volume icons in the style of Windows 11** — the same theme
   replaces the top bar's Wi-Fi icons (a fan of arcs, with the levels not
   reached shown faint) and volume icons (a speaker with one to three waves,

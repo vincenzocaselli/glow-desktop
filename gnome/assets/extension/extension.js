@@ -109,6 +109,10 @@ const CFG = {
     diskLow: 15,
     diskCritical: 7,
 
+    // Color of the Bluetooth indicator in the top bar (r, g, b), or null
+    // to keep the panel's text color.
+    bluetoothColor: [30, 144, 255],
+
 };
 
 // -------------------- FrameGlow --------------------
@@ -843,6 +847,9 @@ export default class Glow extends Extension {
             }
         }
 
+        if (CFG.bluetoothColor)
+            this._tintBluetooth(0);
+
         this._focusHandlerId = global.display.connect(
             'notify::focus-window',
             () => this._onFocusChanged()
@@ -873,6 +880,30 @@ export default class Glow extends Extension {
         this._battery = null;
         this._disk?.destroy();
         this._disk = null;
+        if (this._tintId)
+            GLib.Source.remove(this._tintId);
+        this._tintId = 0;
+        this._bluetoothIcon?.set_style(null);
+        this._bluetoothIcon = null;
+    }
+
+    // The quick settings build their indicators asynchronously: retry
+    // for a few seconds until the Bluetooth one exists.
+    _tintBluetooth(attempt) {
+        const icon = Main.panel.statusArea.quickSettings?._bluetooth?._indicator;
+        if (icon) {
+            const [r, g, b] = CFG.bluetoothColor;
+            icon.set_style(`color: rgb(${r}, ${g}, ${b});`);
+            this._bluetoothIcon = icon;
+            return;
+        }
+        if (attempt < 20) {
+            this._tintId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 500, () => {
+                this._tintId = 0;
+                this._tintBluetooth(attempt + 1);
+                return GLib.SOURCE_REMOVE;
+            });
+        }
     }
 
     // Act on the window that holds the focus once it stops moving.
