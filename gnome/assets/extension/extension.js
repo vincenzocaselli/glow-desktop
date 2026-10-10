@@ -11,6 +11,7 @@
  * License: GPL-3.0-or-later
  * ============================================================ */
 
+import Cairo from 'cairo';
 import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
@@ -19,6 +20,7 @@ import PangoCairo from 'gi://PangoCairo';
 import St from 'gi://St';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import { loadInterfaceXML } from 'resource:///org/gnome/shell/misc/fileUtils.js';
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 
@@ -65,17 +67,48 @@ const CFG = {
     batteryPercentInside: true,
     // Font of the percentage, as a Pango description ("Family Weight").
     // If the family is missing, Pango falls back to the default sans.
-    batteryFont: 'Inter SemiBold',
-    batteryIconWidth: 30,
-    batteryIconHeight: 15,
+    batteryFont: 'Inter Bold',
+    // Minimum width: the icon grows to fit the digits at full size.
+    batteryIconWidth: 34,
+    batteryIconHeight: 17,
+    // Height of the digits, as a fraction of the inner height of the
+    // battery and of the disk capsule.
+    batteryDigitHeight: 0.75,
+    // Size of the unit ("%", "GB") relative to the digits.
+    batteryUnitScale: 0.75,
+    // Charging bolt, drawn inside the battery before the digits: fill
+    // (r, g, b) and a thin dark outline, so it reads on the green fill.
+    batteryBoltColor: [255, 214, 0],
+    batteryBoltOutline: [20, 20, 20],
 
     // Fill colors (r, g, b) and the thresholds, in percent, below which
     // the low and critical colors apply.
-    batteryColor: [46, 160, 67],
-    batteryColorLow: [230, 160, 20],
-    batteryColorCritical: [220, 50, 50],
+    // Light enough for the dark digits drawn over them: at least 5:1
+    // against the panel's text color.
+    batteryColor: [0, 255, 0],
+    batteryColorLow: [245, 196, 90],
+    batteryColorCritical: [240, 128, 128],
     batteryLow: 20,
     batteryCritical: 10,
+
+    // Free disk space, drawn in the style of the battery: a capsule
+    // filled in proportion to the space used, with the free gigabytes
+    // inside. Hover shows the details; a click opens Disk Usage Analyzer.
+    diskSpace: true,
+    diskPath: '/',
+    // Minimum width: the box grows to fit the digits at full size.
+    diskIconWidth: 30,
+    diskIconHeight: 17,
+    diskCornerRadius: 2,
+    diskRefreshSeconds: 60,
+    // Used-space fill (r, g, b, alpha), and the colors and thresholds,
+    // in percent of free space, below which they apply.
+    diskColor: [143, 200, 255, 1],
+    diskColorLow: [245, 196, 90, 1],
+    diskColorCritical: [240, 128, 128, 1],
+    diskLow: 15,
+    diskCritical: 7,
+
 };
 
 // -------------------- FrameGlow --------------------
@@ -202,6 +235,7 @@ const STRINGS = {
         full: 'Fully charged',
         paused: 'Plugged in, not charging',
         battery: 'Battery',
+        diskFree: (free, size, path) => `${free} GB free of ${size} GB (${path})`,
     },
     it: {
         timeLeft: t => `Autonomia: ${t}`,
@@ -211,6 +245,7 @@ const STRINGS = {
         full: 'Carica completa',
         paused: 'In rete, carica in pausa',
         battery: 'Batteria',
+        diskFree: (free, size, path) => `${free} GB liberi su ${size} GB (${path})`,
     },
 };
 
@@ -236,6 +271,29 @@ function fillColor(percentage) {
     if (percentage <= CFG.batteryLow)
         return CFG.batteryColorLow;
     return CFG.batteryColor;
+}
+
+// Resize a drawing to fit its content at full size, from an idle
+// callback: a style change during a repaint would queue a relayout in
+// the middle of the paint. `owner` keeps `_width` and `_applyStyle()`.
+function fitWidth(owner, px, min) {
+    owner._wantWidth = Math.max(min, Math.ceil(px));
+    if (owner._wantWidth === owner._width || owner._fitId)
+        return;
+    owner._fitId = GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
+        owner._fitId = 0;
+        if (owner._wantWidth !== owner._width) {
+            owner._width = owner._wantWidth;
+            owner._applyStyle();
+        }
+        return GLib.SOURCE_REMOVE;
+    });
+}
+
+// Pango markup for a unit drawn smaller than the digits before it.
+function unitMarkup(unit) {
+    const size = Math.round(CFG.batteryUnitScale * 100);
+    return `<span size="${size}%">${unit}</span>`;
 }
 
 // Rounded rectangle path for cairo.
@@ -280,10 +338,11 @@ class Battery {
         this._text = pickStrings();
 
         if (CFG.batteryIcon) {
+            this._width = CFG.batteryIconWidth;
             this._drawing = new St.DrawingArea({
-                style: `width: ${CFG.batteryIconWidth}px; height: ${CFG.batteryIconHeight}px;`,
                 y_align: Clutter.ActorAlign.CENTER,
             });
+            this._applyStyle();
             this._drawing.connect('repaint', area => this._paint(area));
             icon.get_parent().insert_child_above(this._drawing, icon);
         }
@@ -308,6 +367,9 @@ class Battery {
                     () => this._sync());
                 this._sync();
             });
+
+        if (this._drawing)
+            this.onReady?.(this._drawing, this._button);
     }
 
     // Swap the stock icon for the drawn one while a battery is present.
@@ -318,6 +380,7 @@ class Battery {
         const present = this._proxy?.IsPresent;
         if (this._drawing) {
             this._drawing.visible = !!present;
+            this._applyStyle();
             if (present) {
                 this._icon.set_width(0);
                 this._icon.opacity = 0;
@@ -330,10 +393,21 @@ class Battery {
             this._show();
     }
 
+    _isPlugged() {
+        const p = this._proxy;
+        return !!p && [UP_CHARGING, UP_FULLY_CHARGED, UP_PENDING_CHARGE]
+            .includes(p.State);
+    }
+
     _restoreIcon() {
         this._icon?.set_width(-1);
         if (this._icon)
             this._icon.opacity = 255;
+    }
+
+    _applyStyle() {
+        this._drawing?.set_style(
+            `width: ${this._width}px; height: ${CFG.batteryIconHeight}px;`);
     }
 
     _paint(area) {
@@ -343,8 +417,7 @@ class Battery {
         const fg = area.get_theme_node().get_foreground_color();
         const p = this._proxy;
         const pct = Math.max(0, Math.min(100, Math.round(p?.Percentage ?? 0)));
-        const plugged = p && [UP_CHARGING, UP_FULLY_CHARGED, UP_PENDING_CHARGE]
-            .includes(p.State);
+        const plugged = this._isPlugged();
 
         const line = 1.2 * scale;
         const nubW = 2 * scale;
@@ -353,8 +426,9 @@ class Battery {
         const x0 = line / 2;
         const y0 = line / 2;
 
-        // Outline, in the panel's text color so it follows the theme.
         cr.setSourceRGBA(fg.red / 255, fg.green / 255, fg.blue / 255, fg.alpha / 255);
+
+        // Outline, in the panel's text color so it follows the theme.
         cr.setLineWidth(line);
         roundedRect(cr, x0, y0, bodyW, bodyH, 3 * scale);
         cr.stroke();
@@ -376,9 +450,9 @@ class Battery {
             cr.fill();
         }
 
-        // Percentage, and a bolt when on mains power. Two-tone, with no
-        // outline: white where it sits on the fill, the panel's text
-        // color where it sits on the empty part.
+        // Percentage and a smaller "%", in the panel's text color over the
+        // fill and over the empty part alike: a color change inside a
+        // digit hurts reading.
         if (CFG.batteryPercentInside) {
             // Pango rather than cairo's own text API: that one resolves
             // fonts with a plain fontconfig match, which some font
@@ -389,61 +463,59 @@ class Battery {
                 desc.set_absolute_size(px * Pango.SCALE);
                 layout.set_font_description(desc);
             };
-            layout.set_text(`${pct}`, -1);
+            layout.set_markup(`${pct} ${unitMarkup('%')}`, -1);
 
-            const boltW = plugged ? innerH * 0.5 : 0;
-            const gap = plugged ? 1 * scale : 0;
+            const boltW = plugged ? innerH * 0.6 : 0;
+            // Space between the bolt and the digits, about one blank
+            // of the font: the outline of the bolt eats half a pixel.
+            const gap = plugged ? 2.5 * scale : 0;
             const room = innerW - 2 * scale - boltW - gap;
-            // Digits as tall as about 70% of the inner height.
+            // Digits as tall as a fraction of the inner height.
             let px = innerH * 0.95;
             setSize(px);
             let [ink] = layout.get_pixel_extents();
-            px *= innerH * 0.7 / ink.height;
+            px *= innerH * CFG.batteryDigitHeight / ink.height;
             setSize(px);
             [ink] = layout.get_pixel_extents();
-            // "100" next to the bolt does not fit at full size: shrink it.
+            // Ask for the width that fits the text at full size; until
+            // the resize lands, shrink the text into the room there is.
+            fitWidth(this, (ink.width + boltW + gap + 2 * scale + 2 * pad +
+                nubW + line) / scale, CFG.batteryIconWidth);
             if (ink.width > room) {
                 setSize(px * room / ink.width);
                 [ink] = layout.get_pixel_extents();
             }
-            const total = boltW + gap + ink.width;
-            const left = x0 + pad + (innerW - total) / 2;
+            const left = x0 + pad + (innerW - boltW - gap - ink.width) / 2;
             const textX = left + boltW + gap - ink.x;
             const textY = y0 + pad + (innerH - ink.height) / 2 - ink.y;
 
-            const marks = () => {
-                if (plugged) {
-                    const top = y0 + pad + innerH * 0.1;
-                    const bot = y0 + pad + innerH * 0.9;
-                    const mid = (top + bot) / 2;
-                    cr.newPath();
-                    cr.moveTo(left + boltW * 0.65, top);
-                    cr.lineTo(left, mid + innerH * 0.06);
-                    cr.lineTo(left + boltW * 0.45, mid + innerH * 0.06);
-                    cr.lineTo(left + boltW * 0.35, bot);
-                    cr.lineTo(left + boltW, mid - innerH * 0.06);
-                    cr.lineTo(left + boltW * 0.55, mid - innerH * 0.06);
-                    cr.closePath();
-                    cr.fill();
-                }
-                cr.moveTo(textX, textY);
-                PangoCairo.show_layout(cr, layout);
-            };
-
-            const split = x0 + pad + fillW;
-            cr.save();
-            cr.rectangle(split, 0, w - split, h);
-            cr.clip();
             cr.setSourceRGBA(fg.red / 255, fg.green / 255, fg.blue / 255, fg.alpha / 255);
-            marks();
-            cr.restore();
+            cr.moveTo(textX, textY);
+            PangoCairo.show_layout(cr, layout);
 
-            cr.save();
-            cr.rectangle(0, 0, split, h);
-            cr.clip();
-            cr.setSourceRGBA(1, 1, 1, 1);
-            marks();
-            cr.restore();
+            // Charging bolt, left of the digits.
+            if (plugged) {
+                const top = y0 + pad + innerH * 0.08;
+                const bot = y0 + pad + innerH * 0.92;
+                const bh = bot - top;
+                const mid = (top + bot) / 2;
+                cr.newPath();
+                cr.moveTo(left + boltW * 0.7, top);
+                cr.lineTo(left, mid + bh * 0.07);
+                cr.lineTo(left + boltW * 0.45, mid + bh * 0.07);
+                cr.lineTo(left + boltW * 0.3, bot);
+                cr.lineTo(left + boltW, mid - bh * 0.07);
+                cr.lineTo(left + boltW * 0.55, mid - bh * 0.07);
+                cr.closePath();
+                const [br, bg, bb] = CFG.batteryBoltColor;
+                const [or, og, ob] = CFG.batteryBoltOutline;
+                cr.setLineJoin(Cairo.LineJoin.ROUND);
+                cr.setLineWidth(0.8 * scale);
+                cr.setSourceRGBA(br / 255, bg / 255, bb / 255, 1);
+                cr.fillPreserve();
+                cr.setSourceRGBA(or / 255, og / 255, ob / 255, 1);
+                cr.stroke();
+            }
         }
 
         cr.$dispose();
@@ -523,6 +595,10 @@ class Battery {
             GLib.Source.remove(this._waitId);
             this._waitId = 0;
         }
+        if (this._fitId) {
+            GLib.Source.remove(this._fitId);
+            this._fitId = 0;
+        }
         this._buttonIds?.forEach(id => this._button.disconnect(id));
         this._buttonIds = null;
         if (this._propsId)
@@ -534,6 +610,207 @@ class Battery {
         this._drawing = null;
         this._restoreIcon();
         this._icon = null;
+    }
+}
+
+// -------------------- DiskSpace --------------------
+// A compact free-space indicator for the panel, a replacement for the
+// wider "33.4 GB" readouts of system monitor extensions.
+class DiskSpace {
+    constructor() {
+        this._text = pickStrings();
+        this._free = 0;
+        this._size = 0;
+
+        this._button = new PanelMenu.Button(0.0, 'Glow disk space', true);
+        this._width = CFG.diskIconWidth;
+        this._drawing = new St.DrawingArea({
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+        this._applyStyle();
+        this._drawing.connect('repaint', area => this._paint(area));
+        this._button.add_child(this._drawing);
+
+        this._label = new St.Label({ style_class: 'dash-label', visible: false });
+        Main.layoutManager.addTopChrome(this._label);
+        this._button.connect('notify::hover', () => {
+            if (this._button.hover)
+                this._show();
+            else
+                this._label.hide();
+        });
+        this._button.connect('button-press-event', () => {
+            this._label.hide();
+            Gio.DesktopAppInfo.new('org.gnome.baobab.desktop')?.launch([], null);
+            return Clutter.EVENT_STOP;
+        });
+
+        Main.panel.addToStatusArea('glow-disk-space', this._button, 0, 'right');
+
+        this._update();
+        this._timerId = GLib.timeout_add_seconds(GLib.PRIORITY_LOW,
+            CFG.diskRefreshSeconds, () => {
+                this._update();
+                return GLib.SOURCE_CONTINUE;
+            });
+    }
+
+    // Move the indicator into the battery's box, left of the battery,
+    // so the two read as one component. The panel button goes away:
+    // a click then opens the system menu, like the battery.
+    attachBefore(sibling, button) {
+        const parent = sibling.get_parent();
+        if (!parent || !this._button)
+            return;
+        this._button.remove_child(this._drawing);
+        this._host = button;
+        this._applyStyle();
+        parent.insert_child_below(this._drawing, sibling);
+        this._button.destroy();
+        this._button = null;
+
+        this._hostIds = [
+            button.connect('motion-event', () => this._track()),
+            button.connect('leave-event', () => this._label.hide()),
+            button.connect('button-press-event', () => this._label.hide()),
+        ];
+    }
+
+    _applyStyle() {
+        const margin = this._host ? ' margin-right: 6px;' : '';
+        this._drawing?.set_style(
+            `width: ${this._width}px; height: ${CFG.diskIconHeight}px;${margin}`);
+    }
+
+    _track() {
+        const [px, py] = global.get_pointer();
+        const box = this._drawing.get_transformed_extents();
+        const inside = px >= box.origin.x && px <= box.origin.x + box.size.width &&
+            py >= box.origin.y && py <= box.origin.y + box.size.height;
+        if (inside && !this._host?.menu?.isOpen)
+            this._show();
+        else
+            this._label.hide();
+    }
+
+    _update() {
+        try {
+            const info = Gio.File.new_for_path(CFG.diskPath)
+                .query_filesystem_info('filesystem::free,filesystem::size', null);
+            this._free = info.get_attribute_uint64('filesystem::free');
+            this._size = info.get_attribute_uint64('filesystem::size');
+        } catch (e) {
+            this._free = this._size = 0;
+        }
+        this._drawing.queue_repaint();
+    }
+
+    _paint(area) {
+        const cr = area.get_context();
+        const [w, h] = area.get_surface_size();
+        const scale = St.ThemeContext.get_for_stage(global.stage).scale_factor;
+        const fg = area.get_theme_node().get_foreground_color();
+        const setFg = () => cr.setSourceRGBA(fg.red / 255, fg.green / 255,
+            fg.blue / 255, fg.alpha / 255);
+
+        const line = 1.2 * scale;
+        const x0 = line / 2;
+        const y0 = line / 2;
+        const bodyW = w - line;
+        const bodyH = h - line;
+        const radius = CFG.diskCornerRadius * scale;
+        const pad = 1.6 * scale;
+        const innerH = bodyH - 2 * pad;
+
+        // Fill proportional to the space used.
+        if (this._size > 0) {
+            const freePct = 100 * this._free / this._size;
+            const [r, g, b, a] = freePct <= CFG.diskCritical ? CFG.diskColorCritical
+                : freePct <= CFG.diskLow ? CFG.diskColorLow : CFG.diskColor;
+            cr.save();
+            roundedRect(cr, x0 + pad, y0 + pad, bodyW - 2 * pad, innerH,
+                Math.max(radius - pad / 2, 0.5));
+            cr.clip();
+            cr.setSourceRGBA(r / 255, g / 255, b / 255, a);
+            cr.rectangle(x0 + pad, y0 + pad,
+                (bodyW - 2 * pad) * (1 - this._free / this._size), innerH);
+            cr.fill();
+            cr.restore();
+        }
+
+        // Outline: no terminal nub, so it does not read as a second battery.
+        setFg();
+        cr.setLineWidth(line);
+        roundedRect(cr, x0, y0, bodyW, bodyH, radius);
+        cr.stroke();
+
+        // Free gigabytes, a space, and a smaller "GB".
+        const gb = Math.floor(this._free / 1e9);
+        const layout = PangoCairo.create_layout(cr);
+        // Same font and digit height as the battery percentage.
+        const desc = Pango.font_description_from_string(CFG.batteryFont);
+        const setSize = px => {
+            desc.set_absolute_size(px * Pango.SCALE);
+            layout.set_font_description(desc);
+        };
+        layout.set_markup(`${gb} ${unitMarkup('GB')}`, -1);
+        let px = innerH * 0.95;
+        setSize(px);
+        let [ink] = layout.get_pixel_extents();
+        px *= innerH * CFG.batteryDigitHeight / ink.height;
+        setSize(px);
+        [ink] = layout.get_pixel_extents();
+        // As for the battery: grow to fit, shrink only meanwhile.
+        fitWidth(this, (ink.width + 2 * scale + 2 * pad + line) / scale,
+            CFG.diskIconWidth);
+        const room = bodyW - 2 * pad - 2 * scale;
+        if (ink.width > room)
+            setSize(px * room / ink.width);
+        const [ink2] = layout.get_pixel_extents();
+        cr.moveTo(x0 + (bodyW - ink2.width) / 2 - ink2.x,
+            y0 + (bodyH - ink2.height) / 2 - ink2.y);
+        PangoCairo.show_layout(cr, layout);
+
+        cr.$dispose();
+    }
+
+    _show() {
+        const gb = n => Math.round(n / 1e9);
+        this._label.text = this._text.diskFree(gb(this._free), gb(this._size), CFG.diskPath);
+        this._label.show();
+
+        const anchor = this._button ?? this._drawing;
+        const box = anchor.get_transformed_extents();
+        const monitor = Main.layoutManager.findMonitorForActor(anchor);
+        const [, natW] = this._label.get_preferred_width(-1);
+        const [, natH] = this._label.get_preferred_height(-1);
+        const gap = 6;
+        let x = box.origin.x + (box.size.width - natW) / 2;
+        x = Math.max(monitor.x, Math.min(x, monitor.x + monitor.width - natW));
+        const panelAtBottom = box.origin.y > monitor.y + monitor.height / 2;
+        const y = panelAtBottom
+            ? box.origin.y - natH - gap
+            : box.origin.y + box.size.height + gap;
+        this._label.set_position(Math.round(x), Math.round(y));
+    }
+
+    destroy() {
+        if (this._timerId)
+            GLib.Source.remove(this._timerId);
+        this._timerId = 0;
+        if (this._fitId)
+            GLib.Source.remove(this._fitId);
+        this._fitId = 0;
+        this._hostIds?.forEach(id => this._host.disconnect(id));
+        this._hostIds = null;
+        this._label?.destroy();
+        this._label = null;
+        if (this._button)
+            this._button.destroy();
+        else
+            this._drawing?.destroy();
+        this._button = null;
+        this._drawing = null;
     }
 }
 
@@ -550,6 +827,19 @@ export default class Glow extends Extension {
             } catch (e) {
                 console.warn(`Glow: battery features disabled: ${e.message}`);
                 this._battery = null;
+            }
+        }
+
+        if (CFG.diskSpace) {
+            try {
+                this._disk = new DiskSpace();
+                if (this._battery) {
+                    this._battery.onReady = (drawing, button) =>
+                        this._disk?.attachBefore(drawing, button);
+                }
+            } catch (e) {
+                console.warn(`Glow: disk space indicator disabled: ${e.message}`);
+                this._disk = null;
             }
         }
 
@@ -581,6 +871,8 @@ export default class Glow extends Extension {
         this._currentWindow = null;
         this._battery?.destroy();
         this._battery = null;
+        this._disk?.destroy();
+        this._disk = null;
     }
 
     // Act on the window that holds the focus once it stops moving.

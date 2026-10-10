@@ -22,13 +22,22 @@ compositor level.
 - Opacity: 0.95
 - Fully configurable in `extension.js` (no repackage needed)
 
+A compact free-space indicator shows the free gigabytes of `/` (for example
+`33 GB`) in a small box filled in light blue in proportion to the space used:
+amber below 15% free, red below 7%. On laptops it sits next to the battery,
+in the same font; elsewhere it gets its own panel button, whose click opens
+Disk Usage Analyzer. Hovering shows the details (`diskSpace`, `diskPath` in
+`extension.js`).
+
 On laptops the same extension also restyles the battery in the top bar:
 
 - **Battery icon in the style of Windows 11** — horizontal, with a fill
-  proportional to the charge: green, amber at 20% and below, red at 10% and
-  below. The percentage is written inside, white on the fill and in the
-  panel's text color on the empty part. A bolt appears when the charger is
-  plugged in
+  proportional to the charge: light green, amber at 20% and below, red at 10%
+  and below. The percentage is written inside in bold, followed by a smaller
+  `%`, in the panel's text color: the fills are light enough to keep it
+  readable. When the charger is plugged in, a yellow bolt with a thin dark
+  outline appears inside, before the digits. The digits never shrink: the
+  icon widens when the bolt or a third digit needs the room
 - **Remaining time on hover** — resting the pointer on the battery icon shows
   the remaining time on battery, or the time to a full charge. In Italian on
   an Italian system, in English otherwise
