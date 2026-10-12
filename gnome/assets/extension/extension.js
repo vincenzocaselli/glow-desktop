@@ -39,6 +39,12 @@ const CFG = {
     // Bigger = more defined / less "glow-only" look.
     stripWidth: 2,
 
+    // Corner radius of the glow, in px. 0 draws straight corners, which
+    // suit the square window corners of the theme-tweaks module. If you
+    // keep the rounded corners of GNOME, use their radius: 12 for GTK 4
+    // and libadwaita windows, 8 for GTK 3. Maximized windows stay square.
+    cornerRadius: 0,
+
     // Fade-in / fade-out duration in ms.
     fadeMs: 180,
 
@@ -224,6 +230,117 @@ class FrameGlow {
         }
         this._strips = {};
     }
+}
+
+// -------------------- RoundGlow --------------------
+// The same aura with rounded corners: one drawing area around the
+// window, painted with cairo. A clip keeps the frame itself clear, so
+// transparent windows stay untainted as with the strips.
+class RoundGlow {
+    constructor() {
+        this._area = new St.DrawingArea({
+            reactive: false,
+            can_focus: false,
+            track_hover: false,
+            visible: false,
+            opacity: 0,
+        });
+        this._area.connect('repaint', area => this._paint(area));
+        global.window_group.add_child(this._area);
+        global.window_group.set_child_below_sibling(this._area, null);
+
+        this._radius = CFG.cornerRadius;
+        this._visible = false;
+    }
+
+    attachTo(windowActor, metaWindow) {
+        if (!windowActor || !metaWindow) {
+            this.hide();
+            return;
+        }
+        this._applyGeometry(metaWindow);
+        this._area.show();
+        this._area.ease({
+            opacity: 255,
+            duration: CFG.fadeMs,
+            mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+        });
+        this._visible = true;
+    }
+
+    follow(metaWindow) {
+        if (!metaWindow || !this._visible) return;
+        this._applyGeometry(metaWindow);
+    }
+
+    _applyGeometry(metaWindow) {
+        const r = metaWindow.get_frame_rect();
+        const m = CFG.stripWidth + CFG.blur;
+        // GTK squares the corners of a maximized window.
+        const radius = metaWindow.get_maximized() === Meta.MaximizeFlags.BOTH
+            ? 0 : CFG.cornerRadius;
+        this._area.set_position(r.x - m, r.y - m);
+        this._area.set_size(r.width + 2 * m, r.height + 2 * m);
+        if (radius !== this._radius) {
+            this._radius = radius;
+            this._area.queue_repaint();
+        }
+    }
+
+    _paint(area) {
+        const cr = area.get_context();
+        const [w, h] = area.get_surface_size();
+        const sw = CFG.stripWidth;
+        const m = sw + CFG.blur;
+        const radius = Math.min(this._radius, (w - 2 * m) / 2, (h - 2 * m) / 2);
+        const [red, green, blue, alpha] = parseRgba(CFG.color);
+
+        // Everything inside the frame stays transparent.
+        cr.setFillRule(Cairo.FillRule.EVEN_ODD);
+        cr.rectangle(0, 0, w, h);
+        roundedRect(cr, m, m, w - 2 * m, h - 2 * m, radius);
+        cr.clip();
+
+        // Halo: rings of growing width and fading alpha, in place of the
+        // box-shadow blur of the strips. Each ring reaches sw + i px out.
+        for (let i = 1; i <= CFG.blur; i++) {
+            cr.setSourceRGBA(red, green, blue, alpha * 0.16 * (1 - (i - 1) / CFG.blur));
+            cr.setLineWidth(2 * (sw + i));
+            roundedRect(cr, m, m, w - 2 * m, h - 2 * m, radius);
+            cr.stroke();
+        }
+
+        // The strip itself, solid, just outside the frame.
+        cr.setSourceRGBA(red, green, blue, alpha);
+        cr.setLineWidth(sw);
+        roundedRect(cr, m - sw / 2, m - sw / 2, w - 2 * m + sw, h - 2 * m + sw,
+            radius + sw / 2);
+        cr.stroke();
+        cr.$dispose();
+    }
+
+    hide() {
+        this._area.ease({
+            opacity: 0,
+            duration: CFG.fadeMs,
+            mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+            onComplete: () => this._area.hide(),
+        });
+        this._visible = false;
+    }
+
+    destroy() {
+        this._area?.destroy();
+        this._area = null;
+    }
+}
+
+// "rgba(r, g, b, a)" or "rgb(r, g, b)" as cairo components, 0..1.
+function parseRgba(text) {
+    const m = /rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*(?:,\s*([\d.]+)\s*)?\)/.exec(text);
+    if (!m)
+        return [30 / 255, 144 / 255, 255 / 255, 0.95];
+    return [m[1] / 255, m[2] / 255, m[3] / 255, m[4] === undefined ? 1 : Number(m[4])];
 }
 
 // -------------------- Battery --------------------
@@ -964,7 +1081,7 @@ class PreviewWarmer {
 // -------------------- Extension --------------------
 export default class Glow extends Extension {
     enable() {
-        this._glow = new FrameGlow();
+        this._glow = CFG.cornerRadius > 0 ? new RoundGlow() : new FrameGlow();
 
         // The battery features are extras: if the shell layout differs
         // from what they expect, keep the focus glow working regardless.

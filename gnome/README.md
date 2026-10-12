@@ -237,17 +237,29 @@ const CFG = {
     color: 'rgba(30, 144, 255, 0.95)',   // change here
     blur: 6,
     stripWidth: 2,
+    cornerRadius: 0,             // 12 for GNOME's rounded corners, see below
     fadeMs: 180,
     followMove: true,
     // ...
     batteryTooltip: true,        // remaining time on hover
     batteryIcon: true,           // false: keep the stock battery icon
     batteryPercentInside: true,
-    batteryFont: 'Inter SemiBold',
-    batteryIconWidth: 30,
-    batteryIconHeight: 15,
+    batteryFont: 'Inter Bold',
+    batteryIconWidth: 34,
+    batteryIconHeight: 17,
 };
 ```
+
+The changes apply after you reload the extension: log out and back in, or
+on X11 press **Alt+F2**, type `r`, and press **Enter**.
+
+### Rounded corners
+The glow has straight corners by default, to match the square window corners
+of the theme-tweaks module. If you install only the extension
+(`bash install.sh focus-glow`) and keep GNOME's rounded corners, set
+`cornerRadius` to their radius: 12 for GTK 4 and libadwaita windows, 8 for
+GTK 3. The glow then follows the curve of the corners, and goes back to
+straight corners on maximized windows, as the windows themselves do.
 
 Then log out / log in.
 
