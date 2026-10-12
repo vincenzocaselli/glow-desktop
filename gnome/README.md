@@ -265,10 +265,12 @@ GLOW_ROUND_CORNERS=1 bash install.sh theme-tweaks
 
 and set `cornerRadius: 'auto'` in `extension.js`. The glow then reads the
 corners of each window from its pixels and follows them: all four on
-libadwaita windows, the top two on GTK 3 windows and on frames drawn by the
-window manager, none on a maximized window. A number instead of `'auto'` is a
-fixed radius for all four corners. The same applies if you install only the
-extension (`bash install.sh focus-glow`) on a stock GNOME desktop.
+libadwaita windows and on GTK 3 windows with their own title bar (GTK 3
+rounds the top corners only; this mode rounds the bottom ones too), the top
+two on frames drawn by the window manager, none on a maximized window. A
+number instead of `'auto'` is a fixed radius for all four corners. The same
+applies if you install only the extension (`bash install.sh focus-glow`) on a
+stock GNOME desktop.
 
 Open apps pick up the corners when you restart them; the frames drawn by the
 window manager change after you log out and back in.

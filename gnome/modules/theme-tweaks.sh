@@ -24,6 +24,8 @@ GTK3_FILE="$GTK3_DIR/gtk.css"
 SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../assets/css" && pwd)"
 GTK4_SRC="$SRC_DIR/gtk4.css"
 GTK3_SRC="$SRC_DIR/gtk3.css"
+# Extra GTK 3 rules for GLOW_ROUND_CORNERS=1: bottom corners rounded too.
+GTK3_ROUND_SRC="$SRC_DIR/gtk3-round.css"
 # Window button icons, referenced by the CSS as glow/<name>.svg
 ICONS_SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/../assets/titlebuttons" && pwd)"
 ICONS_SUBDIR="glow"
@@ -64,7 +66,8 @@ remove_block() {
     fi
 }
 
-# The CSS source, without the square-corners part when asked.
+# The CSS source, without the square-corners part when asked; the GTK 3
+# file then also gets rounded bottom corners, which GTK 3 leaves square.
 css_source() {
     local src="$1"
     if [[ "$ROUND_CORNERS" == "1" ]]; then
@@ -73,6 +76,10 @@ css_source() {
             index($0, e) == 1 { skip=0; next }
             !skip { print }
         ' "$src"
+        if [[ "$src" == "$GTK3_SRC" ]]; then
+            echo ""
+            cat "$GTK3_ROUND_SRC"
+        fi
     else
         cat "$src"
     fi
