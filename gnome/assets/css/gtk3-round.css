@@ -1,7 +1,8 @@
 /* ---------- rounded bottom corners (GLOW_ROUND_CORNERS=1 only) ----------
    GTK 3 rounds the top corners of a client-side decorated window only.
-   Round the bottom ones too, with the radius of the theme, so the four
-   corners match and the glow follows them all. */
+   Round the bottom ones too, with the radius of the theme (theme-tweaks
+   replaces the 8px below), so the four corners match and the glow follows
+   them all. */
 
 decoration,
 window.csd,

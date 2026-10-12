@@ -66,8 +66,25 @@ remove_block() {
     fi
 }
 
+# The corner radius of the current GTK 3 theme, from its "decoration"
+# rule (15 on Zorin OS, 8 on Adwaita); 8 when it cannot be read.
+theme_corner_radius() {
+    local theme dir css radius
+    theme=$(gsettings get org.gnome.desktop.interface gtk-theme 2>/dev/null | tr -d "'")
+    theme="${theme%"$GLOW_SUFFIX"}"
+    dir=$(find_theme_dir "$theme" 2>/dev/null || true)
+    css="$dir/gtk-3.0/gtk.css"
+    radius=""
+    if [[ -r "$css" ]]; then
+        radius=$(grep -oE 'decoration \{[^}]*border-radius: *[0-9]+px' "$css" \
+            | head -1 | grep -oE '[0-9]+px$' | tr -d 'px')
+    fi
+    echo "${radius:-8}"
+}
+
 # The CSS source, without the square-corners part when asked; the GTK 3
-# file then also gets rounded bottom corners, which GTK 3 leaves square.
+# file then also gets rounded bottom corners, which GTK 3 leaves square,
+# with the radius of the theme.
 css_source() {
     local src="$1"
     if [[ "$ROUND_CORNERS" == "1" ]]; then
@@ -78,7 +95,7 @@ css_source() {
         ' "$src"
         if [[ "$src" == "$GTK3_SRC" ]]; then
             echo ""
-            cat "$GTK3_ROUND_SRC"
+            sed "s/border-radius: 8px;/border-radius: $(theme_corner_radius)px;/" "$GTK3_ROUND_SRC"
         fi
     else
         cat "$src"
