@@ -419,6 +419,11 @@ function cornerRect(cr, x, y, w, h, [tl, tr, br, bl]) {
 // read, so they take a detour through a small PNG in the runtime dir.
 const CORNER_SAMPLE = 32;
 function readCornerRadii(windowActor, metaWindow) {
+    // A window still mapping has no texture yet: reading it would trip an
+    // assertion inside Mutter and bring the shell down, so wait for it.
+    const shaped = windowActor.get_texture();
+    if (!shaped || !shaped.get_texture() || !windowActor.mapped)
+        return null;
     const frame = metaWindow.get_frame_rect();
     const buffer = metaWindow.get_buffer_rect();
     const scale = St.ThemeContext.get_for_stage(global.stage).scale_factor;
