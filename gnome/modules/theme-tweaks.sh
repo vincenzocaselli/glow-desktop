@@ -24,8 +24,10 @@ GTK3_FILE="$GTK3_DIR/gtk.css"
 SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../assets/css" && pwd)"
 GTK4_SRC="$SRC_DIR/gtk4.css"
 GTK3_SRC="$SRC_DIR/gtk3.css"
-# Extra GTK 3 rules for GLOW_ROUND_CORNERS=1: bottom corners rounded too.
+# Extra rules for GLOW_ROUND_CORNERS=1: GTK 3 bottom corners rounded too,
+# GTK 4 window buttons that follow the corners of the frame.
 GTK3_ROUND_SRC="$SRC_DIR/gtk3-round.css"
+GTK4_ROUND_SRC="$SRC_DIR/gtk4-round.css"
 # Window button icons, referenced by the CSS as glow/<name>.svg
 ICONS_SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/../assets/titlebuttons" && pwd)"
 ICONS_SUBDIR="glow"
@@ -93,9 +95,14 @@ css_source() {
             index($0, e) == 1 { skip=0; next }
             !skip { print }
         ' "$src"
+        local radius
+        radius=$(theme_corner_radius)
         if [[ "$src" == "$GTK3_SRC" ]]; then
             echo ""
-            sed "s/border-radius: 8px;/border-radius: $(theme_corner_radius)px;/" "$GTK3_ROUND_SRC"
+            sed "s/border-radius: 8px;/border-radius: ${radius}px;/" "$GTK3_ROUND_SRC"
+        elif [[ "$src" == "$GTK4_SRC" ]]; then
+            echo ""
+            sed "s/-radius: 13px;/-radius: $(( radius > 2 ? radius - 2 : radius ))px;/" "$GTK4_ROUND_SRC"
         fi
     else
         cat "$src"

@@ -1,0 +1,13 @@
+/* ---------- window buttons at the corners (GLOW_ROUND_CORNERS=1 only) ----------
+   On a frame drawn by the window manager the outer buttons sit at the
+   rounded corners of the window. Their outer corner follows the same
+   curve: the radius of the theme minus the 2px gap to the edge
+   (theme-tweaks replaces the 13px below). */
+
+headerbar.default-decoration windowcontrols.end > button:last-child {
+  border-top-right-radius: 13px;
+}
+
+headerbar.default-decoration windowcontrols.start > button:first-child {
+  border-top-left-radius: 13px;
+}
