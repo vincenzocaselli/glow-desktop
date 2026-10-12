@@ -13,9 +13,11 @@
 
 import Cairo from 'cairo';
 import Clutter from 'gi://Clutter';
+import GdkPixbuf from 'gi://GdkPixbuf';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Meta from 'gi://Meta';
+import Mtk from 'gi://Mtk';
 import Pango from 'gi://Pango';
 import PangoCairo from 'gi://PangoCairo';
 import St from 'gi://St';
@@ -39,10 +41,12 @@ const CFG = {
     // Bigger = more defined / less "glow-only" look.
     stripWidth: 2,
 
-    // Corner radius of the glow, in px. 0 draws straight corners, which
-    // suit the square window corners of the theme-tweaks module. If you
-    // keep the rounded corners of GNOME, use their radius: 12 for GTK 4
-    // and libadwaita windows, 8 for GTK 3. Maximized windows stay square.
+    // Corners of the glow. 0 draws straight corners, which suit the square
+    // window corners of the theme-tweaks module. 'auto' reads the corners
+    // of each window from its pixels, so the glow follows rounded corners
+    // where a window has them (all four on libadwaita, the top two on GTK 3
+    // and on server-side frames, none when maximized). A number is a fixed
+    // radius for all four corners, for example 12 for libadwaita.
     cornerRadius: 0,
 
     // Fade-in / fade-out duration in ms.
@@ -235,7 +239,8 @@ class FrameGlow {
 // -------------------- RoundGlow --------------------
 // The same aura with rounded corners: one drawing area around the
 // window, painted with cairo. A clip keeps the frame itself clear, so
-// transparent windows stay untainted as with the strips.
+// transparent windows stay untainted as with the strips. Each corner has
+// its own radius, read from the window's pixels in the 'auto' mode.
 class RoundGlow {
     constructor() {
         this._area = new St.DrawingArea({
@@ -249,7 +254,9 @@ class RoundGlow {
         global.window_group.add_child(this._area);
         global.window_group.set_child_below_sibling(this._area, null);
 
-        this._radius = CFG.cornerRadius;
+        this._radii = [0, 0, 0, 0];
+        this._corners = new WeakMap();
+        this._detectId = 0;
         this._visible = false;
     }
 
@@ -258,6 +265,8 @@ class RoundGlow {
             this.hide();
             return;
         }
+        this._actor = windowActor;
+        this._window = metaWindow;
         this._applyGeometry(metaWindow);
         this._area.show();
         this._area.ease({
@@ -276,15 +285,63 @@ class RoundGlow {
     _applyGeometry(metaWindow) {
         const r = metaWindow.get_frame_rect();
         const m = CFG.stripWidth + CFG.blur;
-        // GTK squares the corners of a maximized window.
-        const radius = metaWindow.get_maximized() === Meta.MaximizeFlags.BOTH
-            ? 0 : CFG.cornerRadius;
         this._area.set_position(r.x - m, r.y - m);
         this._area.set_size(r.width + 2 * m, r.height + 2 * m);
-        if (radius !== this._radius) {
-            this._radius = radius;
-            this._area.queue_repaint();
+        this._setRadii(this._radiiFor(metaWindow, r));
+    }
+
+    _setRadii(radii) {
+        if (radii.every((v, i) => v === this._radii[i]))
+            return;
+        this._radii = radii;
+        this._area.queue_repaint();
+    }
+
+    // Radii for the four corners, clockwise from the top left.
+    _radiiFor(metaWindow, frame) {
+        if (CFG.cornerRadius !== 'auto') {
+            // GTK squares the corners of a maximized window.
+            const radius = metaWindow.get_maximized() === Meta.MaximizeFlags.BOTH
+                ? 0 : CFG.cornerRadius;
+            return [radius, radius, radius, radius];
         }
+        const cached = this._corners.get(metaWindow);
+        if (cached && cached.width === frame.width && cached.height === frame.height)
+            return cached.radii;
+        // A resize in progress: keep the last radii and look again once
+        // it has settled. The first look at a new window happens at once.
+        if (cached)
+            this._scheduleDetect(200);
+        else
+            this._detect();
+        return cached ? cached.radii : this._radii;
+    }
+
+    _scheduleDetect(ms) {
+        if (this._detectId)
+            return;
+        this._detectId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, ms, () => {
+            this._detectId = 0;
+            if (this._visible)
+                this._detect();
+            return GLib.SOURCE_REMOVE;
+        });
+    }
+
+    _detect() {
+        const win = this._window;
+        const actor = this._actor;
+        if (!win || !actor)
+            return;
+        const frame = win.get_frame_rect();
+        const radii = readCornerRadii(actor, win);
+        if (!radii) {
+            // Nothing drawn yet, as on a window still mapping: try again.
+            this._scheduleDetect(250);
+            return;
+        }
+        this._corners.set(win, {width: frame.width, height: frame.height, radii});
+        this._setRadii(radii);
     }
 
     _paint(area) {
@@ -292,13 +349,14 @@ class RoundGlow {
         const [w, h] = area.get_surface_size();
         const sw = CFG.stripWidth;
         const m = sw + CFG.blur;
-        const radius = Math.min(this._radius, (w - 2 * m) / 2, (h - 2 * m) / 2);
+        const limit = Math.min((w - 2 * m) / 2, (h - 2 * m) / 2);
+        const radii = this._radii.map(v => Math.min(v, limit));
         const [red, green, blue, alpha] = parseRgba(CFG.color);
 
         // Everything inside the frame stays transparent.
         cr.setFillRule(Cairo.FillRule.EVEN_ODD);
         cr.rectangle(0, 0, w, h);
-        roundedRect(cr, m, m, w - 2 * m, h - 2 * m, radius);
+        cornerRect(cr, m, m, w - 2 * m, h - 2 * m, radii);
         cr.clip();
 
         // Halo: rings of growing width and fading alpha, in place of the
@@ -306,20 +364,24 @@ class RoundGlow {
         for (let i = 1; i <= CFG.blur; i++) {
             cr.setSourceRGBA(red, green, blue, alpha * 0.16 * (1 - (i - 1) / CFG.blur));
             cr.setLineWidth(2 * (sw + i));
-            roundedRect(cr, m, m, w - 2 * m, h - 2 * m, radius);
+            cornerRect(cr, m, m, w - 2 * m, h - 2 * m, radii);
             cr.stroke();
         }
 
         // The strip itself, solid, just outside the frame.
         cr.setSourceRGBA(red, green, blue, alpha);
         cr.setLineWidth(sw);
-        roundedRect(cr, m - sw / 2, m - sw / 2, w - 2 * m + sw, h - 2 * m + sw,
-            radius + sw / 2);
+        cornerRect(cr, m - sw / 2, m - sw / 2, w - 2 * m + sw, h - 2 * m + sw,
+            radii.map(v => v > 0 ? v + sw / 2 : 0));
         cr.stroke();
         cr.$dispose();
     }
 
     hide() {
+        if (this._detectId) {
+            GLib.Source.remove(this._detectId);
+            this._detectId = 0;
+        }
         this._area.ease({
             opacity: 0,
             duration: CFG.fadeMs,
@@ -330,9 +392,90 @@ class RoundGlow {
     }
 
     destroy() {
+        if (this._detectId)
+            GLib.Source.remove(this._detectId);
+        this._detectId = 0;
         this._area?.destroy();
         this._area = null;
+        this._actor = null;
+        this._window = null;
     }
+}
+
+// Rectangle path with one radius per corner, clockwise from the top left.
+function cornerRect(cr, x, y, w, h, [tl, tr, br, bl]) {
+    cr.newSubPath();
+    cr.arc(x + w - tr, y + tr, tr, -Math.PI / 2, 0);
+    cr.arc(x + w - br, y + h - br, br, 0, Math.PI / 2);
+    cr.arc(x + bl, y + h - bl, bl, Math.PI / 2, Math.PI);
+    cr.arc(x + tl, y + tl, tl, Math.PI, 3 * Math.PI / 2);
+    cr.closePath();
+}
+
+// The corner radii of a window, clockwise from the top left, read from
+// its pixels: along each edge, the transparent run from the corner is as
+// long as the radius. Returns null while the window has nothing drawn.
+// The pixels come out of the actor as a cairo surface, which GJS cannot
+// read, so they take a detour through a small PNG in the runtime dir.
+const CORNER_SAMPLE = 32;
+function readCornerRadii(windowActor, metaWindow) {
+    const frame = metaWindow.get_frame_rect();
+    const buffer = metaWindow.get_buffer_rect();
+    const scale = St.ThemeContext.get_for_stage(global.stage).scale_factor;
+    const n = Math.min(CORNER_SAMPLE, Math.floor(frame.width / 2), Math.floor(frame.height / 2));
+    if (n < 2)
+        return [0, 0, 0, 0];
+
+    const path = GLib.build_filenamev([GLib.get_user_runtime_dir(), 'glow-corner.png']);
+    const radii = [];
+    let drawn = false;
+    const corners = [
+        [frame.x, frame.y, 0, 0],                                 // top left
+        [frame.x + frame.width - n, frame.y, n - 1, 0],           // top right
+        [frame.x + frame.width - n, frame.y + frame.height - n, n - 1, n - 1],  // bottom right
+        [frame.x, frame.y + frame.height - n, 0, n - 1],          // bottom left
+    ];
+    try {
+        for (const [x, y, cx, cy] of corners) {
+            const clip = new Mtk.Rectangle({
+                x: (x - buffer.x) * scale, y: (y - buffer.y) * scale,
+                width: n * scale, height: n * scale,
+            });
+            const surface = windowActor.get_image(clip);
+            if (!surface)
+                return null;
+            surface.writeToPNG(path);
+            const pixbuf = GdkPixbuf.Pixbuf.new_from_file(path);
+            const pixels = pixbuf.get_pixels();
+            const stride = pixbuf.get_rowstride();
+            const channels = pixbuf.get_n_channels();
+            const width = pixbuf.get_width();
+            const height = pixbuf.get_height();
+            const alphaAt = (px, py) => channels < 4 ? 255 : pixels[py * stride + px * channels + 3];
+            const opaque = (px, py) => alphaAt(px, py) >= 16;
+            const dx = cx === 0 ? 1 : -1;
+            const dy = cy === 0 ? 1 : -1;
+            const ex = cx === 0 ? 0 : width - 1;
+            const ey = cy === 0 ? 0 : height - 1;
+            // Transparent run along the horizontal edge, then the vertical one.
+            let runX = 0;
+            while (runX < width && !opaque(ex + dx * runX, ey))
+                runX++;
+            let runY = 0;
+            while (runY < height && !opaque(ex, ey + dy * runY))
+                runY++;
+            if (runX < width || runY < height)
+                drawn = true;
+            const run = Math.min(runX, runY);
+            radii.push(run >= Math.min(width, height) ? 0 : Math.round(run / scale));
+        }
+    } catch (e) {
+        console.warn(`Glow: corner detection failed: ${e.message}`);
+        return [0, 0, 0, 0];
+    } finally {
+        GLib.unlink(path);
+    }
+    return drawn ? radii : null;
 }
 
 // "rgba(r, g, b, a)" or "rgb(r, g, b)" as cairo components, 0..1.
@@ -1081,7 +1224,8 @@ class PreviewWarmer {
 // -------------------- Extension --------------------
 export default class Glow extends Extension {
     enable() {
-        this._glow = CFG.cornerRadius > 0 ? new RoundGlow() : new FrameGlow();
+        this._glow = CFG.cornerRadius === 'auto' || CFG.cornerRadius > 0
+            ? new RoundGlow() : new FrameGlow();
 
         // The battery features are extras: if the shell layout differs
         // from what they expect, keep the focus glow working regardless.

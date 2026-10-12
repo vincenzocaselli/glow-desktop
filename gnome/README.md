@@ -237,7 +237,7 @@ const CFG = {
     color: 'rgba(30, 144, 255, 0.95)',   // change here
     blur: 6,
     stripWidth: 2,
-    cornerRadius: 0,             // 12 for GNOME's rounded corners, see below
+    cornerRadius: 0,             // 'auto' for GNOME's rounded corners, see below
     fadeMs: 180,
     followMove: true,
     // ...
@@ -257,9 +257,10 @@ on X11 press **Alt+F2**, type `r`, and press **Enter**.
 The glow has straight corners by default, to match the square window corners
 of the theme-tweaks module. If you install only the extension
 (`bash install.sh focus-glow`) and keep GNOME's rounded corners, set
-`cornerRadius` to their radius: 12 for GTK 4 and libadwaita windows, 8 for
-GTK 3. The glow then follows the curve of the corners, and goes back to
-straight corners on maximized windows, as the windows themselves do.
+`cornerRadius: 'auto'`. The glow then reads the corners of each window from
+its pixels and follows them: all four on libadwaita windows, the top two on
+GTK 3 windows and on frames drawn by the window manager, none on a maximized
+window. A number instead of `'auto'` is a fixed radius for all four corners.
 
 Then log out / log in.
 
