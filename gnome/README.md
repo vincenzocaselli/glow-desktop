@@ -255,12 +255,23 @@ on X11 press **Alt+F2**, type `r`, and press **Enter**.
 
 ### Rounded corners
 The glow has straight corners by default, to match the square window corners
-of the theme-tweaks module. If you install only the extension
-(`bash install.sh focus-glow`) and keep GNOME's rounded corners, set
-`cornerRadius: 'auto'`. The glow then reads the corners of each window from
-its pixels and follows them: all four on libadwaita windows, the top two on
-GTK 3 windows and on frames drawn by the window manager, none on a maximized
-window. A number instead of `'auto'` is a fixed radius for all four corners.
+of the theme-tweaks module. To keep the rounded corners of your theme
+instead, install theme-tweaks with the square-corners part left out, and let
+the glow read the corners of each window:
+
+```bash
+GLOW_ROUND_CORNERS=1 bash install.sh theme-tweaks
+```
+
+and set `cornerRadius: 'auto'` in `extension.js`. The glow then reads the
+corners of each window from its pixels and follows them: all four on
+libadwaita windows, the top two on GTK 3 windows and on frames drawn by the
+window manager, none on a maximized window. A number instead of `'auto'` is a
+fixed radius for all four corners. The same applies if you install only the
+extension (`bash install.sh focus-glow`) on a stock GNOME desktop.
+
+Open apps pick up the corners when you restart them; the frames drawn by the
+window manager change after you log out and back in.
 
 Then log out / log in.
 

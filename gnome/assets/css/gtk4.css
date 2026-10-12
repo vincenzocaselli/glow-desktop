@@ -5,6 +5,7 @@
    ============================================================ */
 
 /* ---------- square corners ---------- */
+/* GLOW-SQUARE-CORNERS-START: theme-tweaks skips this part with GLOW_ROUND_CORNERS=1 */
 
 headerbar,
 .titlebar,
@@ -21,6 +22,8 @@ window.csd,
 window.csd.background {
   border-radius: 0;
 }
+
+/* GLOW-SQUARE-CORNERS-END */
 
 /* ---------- Dodger Blue accent everywhere ---------- */
 

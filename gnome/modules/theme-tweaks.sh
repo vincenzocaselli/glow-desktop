@@ -37,6 +37,13 @@ SELECTION_BG="#8fc8ff"
 MARK_START="/* === GLOW START === */"
 MARK_END="/* === GLOW END === */"
 
+# GLOW_ROUND_CORNERS=1 keeps the rounded window corners of the theme:
+# the "square corners" part of the CSS is left out. Pair it with
+# cornerRadius: 'auto' in extension.js, so the glow follows the corners.
+ROUND_CORNERS="${GLOW_ROUND_CORNERS:-0}"
+CORNERS_START="/* GLOW-SQUARE-CORNERS-START"
+CORNERS_END="/* GLOW-SQUARE-CORNERS-END"
+
 source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 
 remove_block() {
@@ -57,6 +64,20 @@ remove_block() {
     fi
 }
 
+# The CSS source, without the square-corners part when asked.
+css_source() {
+    local src="$1"
+    if [[ "$ROUND_CORNERS" == "1" ]]; then
+        awk -v s="$CORNERS_START" -v e="$CORNERS_END" '
+            index($0, s) == 1 { skip=1; next }
+            index($0, e) == 1 { skip=0; next }
+            !skip { print }
+        ' "$src"
+    else
+        cat "$src"
+    fi
+}
+
 append_block() {
     local file="$1"
     local src="$2"
@@ -65,7 +86,7 @@ append_block() {
     {
         [[ -f "$file" && -s "$file" ]] && echo ""
         echo "$MARK_START"
-        cat "$src"
+        css_source "$src"
         echo "$MARK_END"
     } >> "$file"
 }
