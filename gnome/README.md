@@ -59,8 +59,11 @@ On laptops the same extension also restyles the battery in the top bar:
 ### 2. `theme-tweaks`
 GTK3 + GTK4 CSS overrides:
 
-- **Square window corners** — all four corners straight (GNOME defaults to
-  rounded top corners only)
+- **Rounded window corners, 12px on all four** — GNOME rounds the top
+  corners only on frames drawn by the window manager; Glow gives GTK 3,
+  GTK 4, and those frames the 12px of libadwaita, and the extension rounds
+  the bottom corners in the compositor. `GLOW_SQUARE_CORNERS=1 bash
+  install.sh theme-tweaks` squares every window instead
 - **Dodger Blue accent everywhere** — selected rows, checked toggles,
   breadcrumbs, switches, progress bars, calendars, menu hovers — every accent
   state matches the focus-glow color
@@ -237,7 +240,8 @@ const CFG = {
     color: 'rgba(30, 144, 255, 0.95)',   // change here
     blur: 6,
     stripWidth: 2,
-    cornerRadius: 0,             // 'auto' for GNOME's rounded corners, see below
+    cornerRadius: 12,            // the glow's corners, see below
+    windowCornerRadius: 12,      // the windows' corners, 0 for square
     fadeMs: 180,
     followMove: true,
     // ...
@@ -254,36 +258,20 @@ The changes apply after you reload the extension: log out and back in, or
 on X11 press **Alt+F2**, type `r`, and press **Enter**.
 
 ### Rounded corners
-The glow has straight corners by default, to match the square window corners
-of the theme-tweaks module. To keep the rounded corners of your theme
-instead, install theme-tweaks with the square-corners part left out, and let
-the glow read the corners of each window:
+Every window gets the same 12px corners, the radius of libadwaita:
+theme-tweaks sets it on GTK 3 and GTK 4 windows and on the frames drawn by
+the window manager, which round the top corners only and leave the bottom
+ones to the application; `windowCornerRadius` in `extension.js` rounds those
+bottom corners in the compositor, with a small shader that clears the corners
+of the window's frame and leaves shadows alone. `cornerRadius` gives the glow
+the same curve. Maximized, tiled, and fullscreen windows stay square.
 
-```bash
-GLOW_ROUND_CORNERS=1 bash install.sh theme-tweaks
-```
-
-and set `cornerRadius: 'auto'` in `extension.js`. The glow then reads the
-corners of each window from its pixels and follows them: all four on
-libadwaita windows and on GTK 3 windows with their own title bar (GTK 3
-rounds the top corners only; this mode rounds the bottom ones too), the top
-two on frames drawn by the window manager, none on a maximized window. A
-number instead of `'auto'` is a fixed radius for all four corners. The same
-applies if you install only the extension (`bash install.sh focus-glow`) on a
-stock GNOME desktop.
+For a desktop with square windows, install theme-tweaks with
+`GLOW_SQUARE_CORNERS=1 bash install.sh theme-tweaks` and set both
+`cornerRadius` and `windowCornerRadius` to 0.
 
 Open apps pick up the corners when you restart them; the frames drawn by the
 window manager change after you log out and back in.
-
-Frames drawn by the window manager round the top corners only: the bottom
-ones belong to the application, which draws them square (Eclipse, Nemo, and
-every other window without its own title bar). `windowCornerRadius` in
-`extension.js` rounds all four corners of every window in the compositor,
-with a small shader that clears the corners of the window's frame; set it to
-the radius of your theme, the same value as `cornerRadius`. Maximized, tiled,
-and fullscreen windows stay square.
-
-Then log out / log in.
 
 ### Accent color
 Find / replace `#1e90ff` in `assets/css/gtk4.css` and `assets/css/gtk3.css`,

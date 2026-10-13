@@ -24,8 +24,8 @@ GTK3_FILE="$GTK3_DIR/gtk.css"
 SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../assets/css" && pwd)"
 GTK4_SRC="$SRC_DIR/gtk4.css"
 GTK3_SRC="$SRC_DIR/gtk3.css"
-# Extra rules for GLOW_ROUND_CORNERS=1: GTK 3 bottom corners rounded too,
-# GTK 4 window buttons that follow the corners of the frame.
+# Extra rules of the rounded mode: 12px corners on GTK 3 and GTK 4 windows,
+# window buttons that follow the corners of the frame.
 GTK3_ROUND_SRC="$SRC_DIR/gtk3-round.css"
 GTK4_ROUND_SRC="$SRC_DIR/gtk4-round.css"
 # Window button icons, referenced by the CSS as glow/<name>.svg
@@ -41,10 +41,12 @@ SELECTION_BG="#8fc8ff"
 MARK_START="/* === GLOW START === */"
 MARK_END="/* === GLOW END === */"
 
-# GLOW_ROUND_CORNERS=1 keeps the rounded window corners of the theme:
-# the "square corners" part of the CSS is left out. Pair it with
-# cornerRadius: 'auto' in extension.js, so the glow follows the corners.
-ROUND_CORNERS="${GLOW_ROUND_CORNERS:-0}"
+# Windows get rounded corners, 12px on all four like libadwaita, and the
+# extension rounds the bottom ones of framed windows to match. With
+# GLOW_SQUARE_CORNERS=1 the CSS squares every window instead; set
+# cornerRadius and windowCornerRadius to 0 in extension.js to match.
+ROUND_CORNERS=1
+[[ "${GLOW_SQUARE_CORNERS:-0}" == "1" ]] && ROUND_CORNERS=0
 CORNERS_START="/* GLOW-SQUARE-CORNERS-START"
 CORNERS_END="/* GLOW-SQUARE-CORNERS-END"
 
@@ -68,25 +70,8 @@ remove_block() {
     fi
 }
 
-# The corner radius of the current GTK 3 theme, from its "decoration"
-# rule (15 on Zorin OS, 8 on Adwaita); 8 when it cannot be read.
-theme_corner_radius() {
-    local theme dir css radius
-    theme=$(gsettings get org.gnome.desktop.interface gtk-theme 2>/dev/null | tr -d "'")
-    theme="${theme%"$GLOW_SUFFIX"}"
-    dir=$(find_theme_dir "$theme" 2>/dev/null || true)
-    css="$dir/gtk-3.0/gtk.css"
-    radius=""
-    if [[ -r "$css" ]]; then
-        radius=$(grep -oE 'decoration \{[^}]*border-radius: *[0-9]+px' "$css" \
-            | head -1 | grep -oE '[0-9]+px$' | tr -d 'px')
-    fi
-    echo "${radius:-8}"
-}
-
-# The CSS source, without the square-corners part when asked; the GTK 3
-# file then also gets rounded bottom corners, which GTK 3 leaves square,
-# with the radius of the theme.
+# The CSS source: in the rounded mode without the square-corners part,
+# plus the rules that give every window the same 12px corners.
 css_source() {
     local src="$1"
     if [[ "$ROUND_CORNERS" == "1" ]]; then
@@ -95,14 +80,11 @@ css_source() {
             index($0, e) == 1 { skip=0; next }
             !skip { print }
         ' "$src"
-        local radius
-        radius=$(theme_corner_radius)
+        echo ""
         if [[ "$src" == "$GTK3_SRC" ]]; then
-            echo ""
-            sed "s/border-radius: 8px;/border-radius: ${radius}px;/" "$GTK3_ROUND_SRC"
+            cat "$GTK3_ROUND_SRC"
         elif [[ "$src" == "$GTK4_SRC" ]]; then
-            echo ""
-            sed "s/-radius: 13px;/-radius: $(( radius > 2 ? radius - 2 : radius ))px;/" "$GTK4_ROUND_SRC"
+            cat "$GTK4_ROUND_SRC"
         fi
     else
         cat "$src"

@@ -6,7 +6,7 @@
 
 <p align="center">
   A soft Dodger Blue aura around the focused window — plus a coherent set of
-  desktop tweaks: blue accents everywhere, square window corners, and
+  desktop tweaks: blue accents everywhere, rounded window corners, and
   Windows-style yellow folders.
   <br><br>
   <a href="gnome/">GNOME / Zorin version</a> ·
@@ -37,7 +37,8 @@ One visual identity, applied consistently across the whole desktop:
   operates at the compositor level.
 - **Dodger Blue accent everywhere** — selections, toggles, breadcrumbs,
   switches, progress bars.
-- **Square window corners** — no rounded corners.
+- **Rounded window corners** — 12px on all four corners, the bottom ones
+  of framed windows too, rounded in the compositor.
 - **Yellow folders** — Windows-style yellow folders via Papirus, yellow even
   at small sizes in list view (where Papirus normally falls back to
   monochrome symbolic icons).
@@ -81,7 +82,7 @@ GNOME Shell).
 |---|---|---|
 | Focus glow | `focus-glow` (Shell extension) | `focus-border` |
 | Blue accent | `theme-tweaks` (GTK CSS) | `accent` |
-| Square corners | `theme-tweaks` | `square-corners` |
+| Window corners | `theme-tweaks` + `focus-glow` (12px, all four) | `square-corners` |
 | Yellow folders | `yellow-folders` | `yellow-folders` |
 | File manager icon + zoom | `nemo-icon`, `nemo-zoom` | `dolphin` |
 | Battery icon + remaining time | `focus-glow` | *(native)* |

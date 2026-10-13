@@ -1,13 +1,21 @@
-/* ---------- window buttons at the corners (GLOW_ROUND_CORNERS=1 only) ----------
-   On a frame drawn by the window manager the outer buttons sit at the
+/* ---------- 12px corners (rounded mode) ----------
+   GTK 4 windows outside libadwaita, and the frames drawn by the window
+   manager, take the radius of the theme. Give them the 12px of
+   libadwaita, so every window on the desktop has the same curve. */
+
+window.csd,
+window.csd.background {
+  border-radius: 12px;
+}
+
+/* On a frame drawn by the window manager the outer buttons sit at the
    rounded corners of the window. Their outer corner follows the same
-   curve: the radius of the theme minus the 2px gap to the edge
-   (theme-tweaks replaces the 13px below). */
+   curve: 12px minus the 2px gap to the edge. */
 
 headerbar.default-decoration windowcontrols.end > button:last-child {
-  border-top-right-radius: 13px;
+  border-top-right-radius: 10px;
 }
 
 headerbar.default-decoration windowcontrols.start > button:first-child {
-  border-top-left-radius: 13px;
+  border-top-left-radius: 10px;
 }

@@ -5,7 +5,7 @@
    ============================================================ */
 
 /* ---------- square corners ---------- */
-/* GLOW-SQUARE-CORNERS-START: theme-tweaks skips this part with GLOW_ROUND_CORNERS=1 */
+/* GLOW-SQUARE-CORNERS-START: theme-tweaks keeps this part only with GLOW_SQUARE_CORNERS=1 */
 
 headerbar,
 .titlebar,
