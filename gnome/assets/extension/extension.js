@@ -1042,7 +1042,12 @@ class RoundedWindows {
         if (!win || this._windows.has(win) || !this._wanted(win))
             return;
         const effect = new CornerMask();
-        actor.add_effect_with_name('glow-corners', effect);
+        try {
+            actor.add_effect_with_name('glow-corners', effect);
+        } catch (e) {
+            console.warn(`Glow: no corner mask for "${win.get_title()}": ${e.message}`);
+            return;
+        }
         // The frame keeps its place inside the actor while the window
         // moves, so only size changes need a new mask: a move would read
         // the actor's position and the frame at different moments and
@@ -1083,10 +1088,15 @@ class RoundedWindows {
         const entry = this._windows.get(win);
         if (!entry)
             return;
-        entry.ids.forEach(id => win.disconnect(id));
-        entry.actor.disconnect(entry.actorId);
-        entry.actor.remove_effect(entry.effect);
         this._windows.delete(win);
+        // The actor may already be gone when a window unmanages.
+        try {
+            entry.ids.forEach(id => win.disconnect(id));
+            entry.actor.disconnect(entry.actorId);
+            entry.actor.remove_effect(entry.effect);
+        } catch (e) {
+            console.debug?.(`Glow: corner mask cleanup: ${e.message}`);
+        }
     }
 
     destroy() {
