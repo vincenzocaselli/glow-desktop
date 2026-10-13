@@ -275,6 +275,14 @@ stock GNOME desktop.
 Open apps pick up the corners when you restart them; the frames drawn by the
 window manager change after you log out and back in.
 
+Frames drawn by the window manager round the top corners only: the bottom
+ones belong to the application, which draws them square (Eclipse, Nemo, and
+every other window without its own title bar). `windowCornerRadius` in
+`extension.js` rounds all four corners of every window in the compositor,
+with a small shader that clears the corners of the window's frame; set it to
+the radius of your theme, the same value as `cornerRadius`. Maximized, tiled,
+and fullscreen windows stay square.
+
 Then log out / log in.
 
 ### Accent color

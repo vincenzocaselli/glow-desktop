@@ -16,10 +16,12 @@ import Clutter from 'gi://Clutter';
 import GdkPixbuf from 'gi://GdkPixbuf';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
+import GObject from 'gi://GObject';
 import Meta from 'gi://Meta';
 import Mtk from 'gi://Mtk';
 import Pango from 'gi://Pango';
 import PangoCairo from 'gi://PangoCairo';
+import Shell from 'gi://Shell';
 import St from 'gi://St';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
@@ -135,6 +137,14 @@ const CFG = {
     warmIdleMs: 3000,
     // How long a window stays shown, invisibly, to draw its content.
     warmShowMs: 800,
+
+    // Rounded corners for every window, in px, cut in the compositor at the
+    // window's frame. Frames drawn by the window manager round the top
+    // corners only and leave the bottom ones to the application, which
+    // draws them square; this rounds all four, with the radius of the
+    // theme (15 on Zorin OS, 12 for libadwaita, 8 for Adwaita). Maximized,
+    // tiled, and fullscreen windows stay square. 0 turns it off.
+    windowCornerRadius: 0,
 };
 
 // -------------------- FrameGlow --------------------
@@ -1095,6 +1105,117 @@ class DiskSpace {
     }
 }
 
+// -------------------- RoundedWindows --------------------
+// A fragment shader on each window actor that clears the pixels of the
+// frame rectangle outside a rounded rectangle, with one pixel of
+// anti-aliasing. Shadows and other pixels outside the frame are left
+// alone. The frame rectangle and the radius are uniforms, updated when
+// the window moves or resizes.
+const CornerMask = GObject.registerClass(
+class CornerMask extends Shell.GLSLEffect {
+    vfunc_build_pipeline() {
+        const declarations = `
+            uniform vec4 bounds;
+            uniform float radius;
+            uniform vec2 pixel_step;
+        `;
+        const code = `
+            vec2 p = cogl_tex_coord0_in.xy / pixel_step;
+            if (radius > 0.0 && p.x >= bounds.x && p.x <= bounds.z &&
+                p.y >= bounds.y && p.y <= bounds.w) {
+                vec2 center = (bounds.xy + bounds.zw) * 0.5;
+                vec2 half_size = (bounds.zw - bounds.xy) * 0.5 - vec2(radius);
+                vec2 d = abs(p - center) - half_size;
+                float dist = length(max(d, vec2(0.0))) - radius;
+                cogl_color_out *= 1.0 - smoothstep(-0.7, 0.7, dist);
+            }
+        `;
+        this.add_glsl_snippet(Shell.SnippetHook.FRAGMENT, declarations, code, false);
+    }
+
+    _init() {
+        super._init();
+        this._bounds = this.get_uniform_location('bounds');
+        this._radius = this.get_uniform_location('radius');
+        this._pixelStep = this.get_uniform_location('pixel_step');
+    }
+
+    setParams(bounds, radius, width, height) {
+        this.set_uniform_float(this._bounds, 4, bounds);
+        this.set_uniform_float(this._radius, 1, [radius]);
+        this.set_uniform_float(this._pixelStep, 2, [1 / width, 1 / height]);
+        this.queue_repaint();
+    }
+});
+
+class RoundedWindows {
+    constructor() {
+        this._windows = new Map();
+        this._mapId = global.window_manager.connect('map',
+            (wm, actor) => this._attach(actor));
+        for (const actor of global.get_window_actors())
+            this._attach(actor);
+    }
+
+    _wanted(win) {
+        const type = win.get_window_type();
+        return type === Meta.WindowType.NORMAL ||
+            type === Meta.WindowType.DIALOG ||
+            type === Meta.WindowType.MODAL_DIALOG;
+    }
+
+    _attach(actor) {
+        const win = actor.meta_window;
+        if (!win || this._windows.has(win) || !this._wanted(win))
+            return;
+        const effect = new CornerMask();
+        actor.add_effect_with_name('glow-corners', effect);
+        const ids = [
+            win.connect('size-changed', () => this._update(win)),
+            win.connect('position-changed', () => this._update(win)),
+            win.connect('unmanaging', () => this._detach(win)),
+        ];
+        this._windows.set(win, {actor, effect, ids});
+        this._update(win);
+    }
+
+    _update(win) {
+        const entry = this._windows.get(win);
+        if (!entry)
+            return;
+        const {actor, effect} = entry;
+        const scale = St.ThemeContext.get_for_stage(global.stage).scale_factor;
+        const frame = win.get_frame_rect();
+        const [ax, ay] = actor.get_position();
+        const [aw, ah] = actor.get_size();
+        if (aw < 1 || ah < 1)
+            return;
+        const square = win.get_maximized() !== 0 || win.fullscreen;
+        const radius = square ? 0 : CFG.windowCornerRadius;
+        effect.setParams([
+            (frame.x - ax) * scale, (frame.y - ay) * scale,
+            (frame.x - ax + frame.width) * scale, (frame.y - ay + frame.height) * scale,
+        ], radius * scale, aw * scale, ah * scale);
+    }
+
+    _detach(win) {
+        const entry = this._windows.get(win);
+        if (!entry)
+            return;
+        entry.ids.forEach(id => win.disconnect(id));
+        entry.actor.remove_effect(entry.effect);
+        this._windows.delete(win);
+    }
+
+    destroy() {
+        for (const win of [...this._windows.keys()])
+            this._detach(win);
+        if (this._mapId)
+            global.window_manager.disconnect(this._mapId);
+        this._mapId = 0;
+    }
+}
+
 // -------------------- PreviewWarmer --------------------
 // The overview shows a clone of each window's content. A window that
 // was minimized before its application ever drew it has no content,
@@ -1268,6 +1389,15 @@ export default class Glow extends Extension {
             }
         }
 
+        if (CFG.windowCornerRadius > 0) {
+            try {
+                this._rounded = new RoundedWindows();
+            } catch (e) {
+                console.warn(`Glow: rounded windows disabled: ${e.message}`);
+                this._rounded = null;
+            }
+        }
+
         this._focusHandlerId = global.display.connect(
             'notify::focus-window',
             () => this._onFocusChanged()
@@ -1296,6 +1426,8 @@ export default class Glow extends Extension {
         this._currentWindow = null;
         this._battery?.destroy();
         this._battery = null;
+        this._rounded?.destroy();
+        this._rounded = null;
         this._warmer?.destroy();
         this._warmer = null;
         this._disk?.destroy();
