@@ -1170,12 +1170,16 @@ class RoundedWindows {
             return;
         const effect = new CornerMask();
         actor.add_effect_with_name('glow-corners', effect);
+        // The frame keeps its place inside the actor while the window
+        // moves, so only size changes need a new mask: a move would read
+        // the actor's position and the frame at different moments and
+        // let the square corners through for a frame.
         const ids = [
             win.connect('size-changed', () => this._update(win)),
-            win.connect('position-changed', () => this._update(win)),
             win.connect('unmanaging', () => this._detach(win)),
         ];
-        this._windows.set(win, {actor, effect, ids});
+        const actorId = actor.connect('notify::size', () => this._update(win));
+        this._windows.set(win, {actor, effect, ids, actorId});
         this._update(win);
     }
 
@@ -1185,16 +1189,20 @@ class RoundedWindows {
             return;
         const {actor, effect} = entry;
         const scale = St.ThemeContext.get_for_stage(global.stage).scale_factor;
+        // Frame and buffer rectangles come from the same window state,
+        // so their offset is consistent even in the middle of a move.
         const frame = win.get_frame_rect();
-        const [ax, ay] = actor.get_position();
+        const buffer = win.get_buffer_rect();
         const [aw, ah] = actor.get_size();
         if (aw < 1 || ah < 1)
             return;
         const square = win.get_maximized() !== 0 || win.fullscreen;
         const radius = square ? 0 : CFG.windowCornerRadius;
+        const x = frame.x - buffer.x;
+        const y = frame.y - buffer.y;
         effect.setParams([
-            (frame.x - ax) * scale, (frame.y - ay) * scale,
-            (frame.x - ax + frame.width) * scale, (frame.y - ay + frame.height) * scale,
+            x * scale, y * scale,
+            (x + frame.width) * scale, (y + frame.height) * scale,
         ], radius * scale, aw * scale, ah * scale);
     }
 
@@ -1203,6 +1211,7 @@ class RoundedWindows {
         if (!entry)
             return;
         entry.ids.forEach(id => win.disconnect(id));
+        entry.actor.disconnect(entry.actorId);
         entry.actor.remove_effect(entry.effect);
         this._windows.delete(win);
     }
