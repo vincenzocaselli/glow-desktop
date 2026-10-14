@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="docs/images/glow-logo.png" alt="Glow logo" width="160">
-</p>
-
 <h1 align="center">Glow</h1>
 
 <p align="center">
