@@ -135,7 +135,7 @@ ${YELLOW}Next step — log out and back in.${NC}
 
   - The Glow extension will be enabled automatically, or you can
     enable it from the Extensions app.
-  - Square corners, Dodger Blue accent, yellow folders, and the
+  - Rounded corners, Dodger Blue accent, yellow folders, and the
     yellow Nemo icon are all active immediately.
 
 ${DIM}If the Glow extension does not appear after login, run:${NC}

@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # ============================================================
 # Glow — Module: theme-tweaks
-# Installs GTK3 and GTK4 CSS overrides: square corners + Dodger
-# Blue accent. Uses a marked block inside gtk.css so other user
-# CSS is preserved on install / remove.
+# Installs GTK3 and GTK4 CSS overrides: 12px rounded corners
+# (square with GLOW_SQUARE_CORNERS=1) + Dodger Blue accent. Uses a
+# marked block inside gtk.css so other user CSS is preserved on
+# install / remove.
 #
 # Also activates <theme>-Glow, a GTK theme that imports the current
 # one and changes only its selection colors. Toolkits that read the
