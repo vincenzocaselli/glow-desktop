@@ -25,6 +25,7 @@ import St from 'gi://St';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
+import {WindowIcon} from 'resource:///org/gnome/shell/ui/altTab.js';
 import {WindowPreview} from 'resource:///org/gnome/shell/ui/windowPreview.js';
 import { loadInterfaceXML } from 'resource:///org/gnome/shell/misc/fileUtils.js';
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
@@ -155,6 +156,11 @@ const CFG = {
     // monitor only. true lets the arrow keys and Tab reach the previews of
     // every monitor while a preview has the focus.
     previewKeys: true,
+
+    // Size of the window previews in Alt+Tab, in px: the Shell draws them
+    // at 128, a postage stamp on a 1080p screen. The list scrolls when the
+    // items no longer fit. 0 keeps the Shell's size.
+    switcherPreviewSize: 256,
 };
 
 // -------------------- FrameGlow --------------------
@@ -1464,6 +1470,37 @@ class PreviewNavigator {
     }
 }
 
+// -------------------- SwitcherPreviews --------------------
+// Alt+Tab shows each window as a clone of WINDOW_PREVIEW_SIZE px, a
+// constant of the Shell. The Shell builds the item, then this enlarges
+// the clone and its box to CFG.switcherPreviewSize with the same fit
+// rule as the Shell's; the icon badge keeps its size.
+class SwitcherPreviews {
+    constructor() {
+        const proto = WindowIcon.prototype;
+        this._init = proto._init;
+        const init = this._init;
+        const size = CFG.switcherPreviewSize;
+        proto._init = function (...args) {
+            init.apply(this, args);
+            const clone = this._icon?.get_children().find(c => c instanceof Clutter.Clone);
+            if (!clone?.source)
+                return;
+            const px = size * St.ThemeContext.get_for_stage(global.stage).scale_factor;
+            const [w, h] = clone.source.get_size();
+            if (w < 1 || h < 1)
+                return;
+            const scale = Math.min(1, px / w, px / h);
+            clone.set_size(w * scale, h * scale);
+            this._icon.set_size(px, px);
+        };
+    }
+
+    destroy() {
+        WindowIcon.prototype._init = this._init;
+    }
+}
+
 export default class Glow extends Extension {
     enable() {
         this._glow = CFG.cornerRadius > 0 ? new RoundGlow() : new FrameGlow();
@@ -1522,6 +1559,15 @@ export default class Glow extends Extension {
             }
         }
 
+        if (CFG.switcherPreviewSize > 0) {
+            try {
+                this._switcher = new SwitcherPreviews();
+            } catch (e) {
+                console.warn(`Glow: Alt+Tab preview size disabled: ${e.message}`);
+                this._switcher = null;
+            }
+        }
+
         if (CFG.previewKeys) {
             try {
                 this._navigator = new PreviewNavigator();
@@ -1567,6 +1613,8 @@ export default class Glow extends Extension {
         this._ring = null;
         this._navigator?.destroy();
         this._navigator = null;
+        this._switcher?.destroy();
+        this._switcher = null;
         this._disk?.destroy();
         this._disk = null;
         if (this._tintId)

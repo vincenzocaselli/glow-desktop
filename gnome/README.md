@@ -34,6 +34,8 @@ the pointer, or the keyboard: press Tab to reach the first window, then the
 arrow keys or Tab to move, Enter to activate. The keys reach the windows of
 every monitor, where the Shell stops at the primary one (`previewRing` and
 `previewKeys` in `extension.js`; the switcher ring is in `stylesheet.css`).
+Alt+Tab draws its previews at 256px instead of the Shell's 128
+(`switcherPreviewSize`; the list scrolls when they no longer fit).
 
 The Bluetooth indicator in the top bar is drawn in Dodger Blue
 (`bluetoothColor` in `extension.js`; `null` keeps the panel's text color).
