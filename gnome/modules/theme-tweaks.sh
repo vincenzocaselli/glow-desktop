@@ -122,40 +122,43 @@ zorin_day_theme() {
 }
 
 build_derived_theme() {
-    local base="$1" base_dir="$2" dir="$3" fg
+    local base="$1" base_dir="$2" dir="$3" fg v
     fg=$(grep -m1 -oP '@define-color theme_fg_color\s+\K#[0-9a-fA-F]{3,6}' "$base_dir/gtk-3.0/gtk.css" 2>/dev/null || true)
     fg="${fg:-#2e3436}"
 
     rm -rf "$dir"
-    mkdir -p "$dir/gtk-3.0"
+    mkdir -p "$dir"
     if [[ -f "$base_dir/index.theme" ]]; then
         sed -e "s/^Name=.*/Name=$base$GLOW_SUFFIX/" \
             -e "s/^GtkTheme=.*/GtkTheme=$base$GLOW_SUFFIX/" \
             "$base_dir/index.theme" > "$dir/index.theme"
     fi
-    [[ -d "$base_dir/gtk-2.0" ]] && ln -s "$base_dir/gtk-2.0" "$dir/gtk-2.0"
+    # The base theme is copied, not imported by its absolute path: a flatpak
+    # app sees ~/.themes through the home directory but not /usr/share/themes,
+    # and a failed @import leaves its GTK dialogs without a background.
+    for v in gtk-2.0 gtk-3.0 gtk-4.0; do
+        [[ -d "$base_dir/$v" ]] && cp -r "$base_dir/$v" "$dir/$v"
+    done
+    for v in gtk-3.0 gtk-4.0; do
+        [[ -f "$dir/$v/gtk.css" ]] || continue
+        mv "$dir/$v/gtk.css" "$dir/$v/base.css"
+        echo '@import url("base.css");' > "$dir/$v/gtk.css"
+        if [[ -f "$dir/$v/gtk-dark.css" ]]; then
+            mv "$dir/$v/gtk-dark.css" "$dir/$v/base-dark.css"
+            echo '@import url("base-dark.css");' > "$dir/$v/gtk-dark.css"
+        fi
+    done
 
     cat > "$dir/gtk-3.0/gtk.css" <<CSS
 /* Glow: $base with the glass selection as opaque named colors.
    SWT (Eclipse) reads these from the theme file, not from gtk.css. */
-@import url("$base_dir/gtk-3.0/gtk.css");
+@import url("base.css");
 
 @define-color theme_selected_bg_color $SELECTION_BG;
 @define-color theme_selected_fg_color $fg;
 @define-color theme_unfocused_selected_bg_color $SELECTION_BG;
 @define-color theme_unfocused_selected_fg_color $fg;
 CSS
-    [[ -f "$base_dir/gtk-3.0/gtk-dark.css" ]] && \
-        echo "@import url(\"$base_dir/gtk-3.0/gtk-dark.css\");" > "$dir/gtk-3.0/gtk-dark.css"
-
-    if [[ -d "$base_dir/gtk-4.0" ]]; then
-        mkdir -p "$dir/gtk-4.0"
-        local f
-        for f in gtk.css gtk-dark.css; do
-            [[ -f "$base_dir/gtk-4.0/$f" ]] && \
-                echo "@import url(\"$base_dir/gtk-4.0/$f\");" > "$dir/gtk-4.0/$f"
-        done
-    fi
 }
 
 install_derived_theme() {

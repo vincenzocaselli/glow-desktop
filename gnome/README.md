@@ -78,8 +78,11 @@ GTK3 + GTK4 CSS overrides:
   every GTK4 / libadwaita app, not just Files
 - **Same selection in Eclipse** — Eclipse (SWT) reads its selection colors
   from the GTK theme file, not from `gtk.css`. The module activates
-  `<theme>-Glow`, a theme that imports the current one and only replaces the
-  selection colors with the opaque equivalent of the glass (`#8fc8ff`)
+  `<theme>-Glow`, a copy of the current theme that only replaces the
+  selection colors with the opaque equivalent of the glass (`#8fc8ff`). It is
+  a copy, not an import: flatpak apps see `~/.themes` but not
+  `/usr/share/themes`, and a theme that fails to import leaves their GTK
+  dialogs without a background
 - **Light blue title bar** — the focused window's title bar is light blue
   (`#c7e3ff`, Dodger Blue at 25% over white), the others stay white. Covers
   GTK3, GTK4, and the title bars the window manager draws for apps such as
@@ -198,8 +201,8 @@ updates files in place rather than duplicating them.
 - Same block in `~/.config/gtk-3.0/gtk.css`
 - Pre-existing user CSS in those files is preserved
 - Copies the window button icons to `~/.config/gtk-{3,4}.0/glow/`
-- Creates `~/.themes/<theme>-Glow/` and sets it as the GTK theme (also as the
-  Zorin day theme, when present)
+- Creates `~/.themes/<theme>-Glow/` (a copy of the theme, about 1.6 MB) and sets
+  it as the GTK theme (also as the Zorin day theme, when present)
 - State file in `~/.config/glow/theme-tweaks.state` (used by `--remove`)
 - On Zorin OS, sets `org.gnome.shell.extensions.zorin-taskbar panel-size` to
   42; the previous value is saved in `~/.config/glow/taskbar.state`
