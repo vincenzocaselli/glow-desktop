@@ -16,6 +16,7 @@ import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
+import Graphene from 'gi://Graphene';
 import Meta from 'gi://Meta';
 import Pango from 'gi://Pango';
 import PangoCairo from 'gi://PangoCairo';
@@ -24,6 +25,7 @@ import St from 'gi://St';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
+import {WindowPreview} from 'resource:///org/gnome/shell/ui/windowPreview.js';
 import { loadInterfaceXML } from 'resource:///org/gnome/shell/misc/fileUtils.js';
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 
@@ -142,6 +144,12 @@ const CFG = {
     // same, so every window ends up alike. Maximized, tiled, and
     // fullscreen windows stay square. 0 turns it off.
     windowCornerRadius: 12,
+
+    // Ring in the glow color around the window under the pointer, or the
+    // one Tab and the arrow keys reached, in the overview: the Shell marks
+    // it only with its title and close button. Alt+Tab gets the same ring
+    // from stylesheet.css. false turns the overview ring off.
+    previewRing: true,
 };
 
 // -------------------- FrameGlow --------------------
@@ -1240,6 +1248,85 @@ class PreviewWarmer {
 }
 
 // -------------------- Extension --------------------
+// -------------------- PreviewRing --------------------
+// The overview marks the window under the pointer, or the one that Tab
+// and the arrow keys reached, only with its title and close button. A
+// ring in the glow color around that preview makes the selection as
+// visible as in Alt+Tab. The ring is a sibling of the window container,
+// bound to its allocation and copying its scale, so it follows the
+// slight zoom of the hovered preview.
+class PreviewRing {
+    constructor() {
+        this._rings = new Set();
+        const proto = WindowPreview.prototype;
+        this._showOverlay = proto.showOverlay;
+        this._hideOverlay = proto.hideOverlay;
+        const self = this;
+        proto.showOverlay = function (animate) {
+            self._showOverlay.call(this, animate);
+            if (!this._overlayShown)
+                return;
+            self._ringFor(this)?.ease({
+                opacity: 255,
+                duration: animate ? CFG.fadeMs : 0,
+                mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+            });
+        };
+        proto.hideOverlay = function (animate) {
+            const shown = this._overlayShown;
+            self._hideOverlay.call(this, animate);
+            if (shown) {
+                this._glowRing?.ease({
+                    opacity: 0,
+                    duration: animate ? CFG.fadeMs : 0,
+                    mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+                });
+            }
+        };
+    }
+
+    _ringFor(preview) {
+        if (preview._glowRing)
+            return preview._glowRing;
+        const container = preview.window_container;
+        if (!container)
+            return null;
+        const pad = 4 * St.ThemeContext.get_for_stage(global.stage).scale_factor;
+        const ring = new St.Widget({
+            style_class: 'glow-preview-ring',
+            opacity: 0,
+            reactive: false,
+            pivot_point: new Graphene.Point({x: 0.5, y: 0.5}),
+        });
+        for (const [coordinate, offset] of [
+            [Clutter.BindCoordinate.X, -pad],
+            [Clutter.BindCoordinate.Y, -pad],
+            [Clutter.BindCoordinate.WIDTH, 2 * pad],
+            [Clutter.BindCoordinate.HEIGHT, 2 * pad],
+        ])
+            ring.add_constraint(new Clutter.BindConstraint({source: container, coordinate, offset}));
+        container.connectObject('notify::scale-x',
+            () => ring.set_scale(container.scale_x, container.scale_y), ring);
+        preview.add_child(ring);
+        preview.set_child_above_sibling(ring, container);
+        preview._glowRing = ring;
+        this._rings.add(ring);
+        ring.connect('destroy', () => {
+            this._rings.delete(ring);
+            preview._glowRing = null;
+        });
+        return ring;
+    }
+
+    destroy() {
+        WindowPreview.prototype.showOverlay = this._showOverlay;
+        WindowPreview.prototype.hideOverlay = this._hideOverlay;
+        for (const ring of [...this._rings])
+            ring.destroy();
+        this._rings.clear();
+    }
+}
+
 export default class Glow extends Extension {
     enable() {
         this._glow = CFG.cornerRadius > 0 ? new RoundGlow() : new FrameGlow();
@@ -1289,6 +1376,15 @@ export default class Glow extends Extension {
             }
         }
 
+        if (CFG.previewRing) {
+            try {
+                this._ring = new PreviewRing();
+            } catch (e) {
+                console.warn(`Glow: overview preview ring disabled: ${e.message}`);
+                this._ring = null;
+            }
+        }
+
         this._focusHandlerId = global.display.connect(
             'notify::focus-window',
             () => this._onFocusChanged()
@@ -1321,6 +1417,8 @@ export default class Glow extends Extension {
         this._rounded = null;
         this._warmer?.destroy();
         this._warmer = null;
+        this._ring?.destroy();
+        this._ring = null;
         this._disk?.destroy();
         this._disk = null;
         if (this._tintId)

@@ -27,3 +27,21 @@
   padding: 0 1px;
   margin: 0 1px;
 }
+
+/* Glow — ring in the glow color around the selected window or app in
+   Alt+Tab and Super+Tab, as in the Windows switcher, instead of the
+   theme's filled box. An inset shadow keeps the item size unchanged. */
+.switcher-list .item-box:selected,
+.switcher-list .item-box:focus,
+.switcher-list .thumbnail-box:selected {
+  background-color: rgba(30, 144, 255, 0.10);
+  box-shadow: inset 0 0 0 2px #1e90ff;
+}
+
+/* The same ring around the hovered or keyboard-focused window preview in
+   the overview (PreviewRing in extension.js). */
+.glow-preview-ring {
+  border: 3px solid #1e90ff;
+  border-radius: 10px;
+  background-color: transparent;
+}
