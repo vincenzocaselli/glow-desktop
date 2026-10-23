@@ -31,8 +31,9 @@ and mouse are idle, then minimizes it again (`warmMinimized` in `extension.js`).
 In Alt+Tab, Super+Tab, and the overview the selected preview gets a ring in
 the glow color, as in the Windows switcher. In the overview the ring follows
 the pointer, or the keyboard: press Tab to reach the first window, then the
-arrow keys to move, Enter to activate (`previewRing` in `extension.js`; the
-switcher ring is in `stylesheet.css`).
+arrow keys or Tab to move, Enter to activate. The keys reach the windows of
+every monitor, where the Shell stops at the primary one (`previewRing` and
+`previewKeys` in `extension.js`; the switcher ring is in `stylesheet.css`).
 
 The Bluetooth indicator in the top bar is drawn in Dodger Blue
 (`bluetoothColor` in `extension.js`; `null` keeps the panel's text color).

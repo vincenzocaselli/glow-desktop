@@ -150,6 +150,11 @@ const CFG = {
     // it only with its title and close button. Alt+Tab gets the same ring
     // from stylesheet.css. false turns the overview ring off.
     previewRing: true,
+
+    // The Shell moves the keyboard focus among the previews of the primary
+    // monitor only. true lets the arrow keys and Tab reach the previews of
+    // every monitor while a preview has the focus.
+    previewKeys: true,
 };
 
 // -------------------- FrameGlow --------------------
@@ -1327,6 +1332,138 @@ class PreviewRing {
     }
 }
 
+// -------------------- PreviewNavigator --------------------
+// The Shell navigates the overview with the arrow keys and Tab inside the
+// WorkspacesView of the primary monitor; the other monitors have views of
+// their own that the focus never reaches. While a preview has the focus,
+// Glow handles those keys itself over the previews of every monitor, by
+// their position on the stage, and leaves every other key alone.
+class PreviewNavigator {
+    constructor() {
+        this._eventId = global.stage.connect('captured-event',
+            (stage, event) => this._onEvent(event));
+    }
+
+    _onEvent(event) {
+        if (event.type() !== Clutter.EventType.KEY_PRESS)
+            return Clutter.EVENT_PROPAGATE;
+        if (!Main.overview.visible || Main.overview.dash?.showAppsButton?.checked)
+            return Clutter.EVENT_PROPAGATE;
+        const focus = global.stage.key_focus;
+        if (!(focus instanceof WindowPreview))
+            return Clutter.EVENT_PROPAGATE;
+        const state = event.get_state() &
+            (Clutter.ModifierType.CONTROL_MASK | Clutter.ModifierType.MOD1_MASK |
+             Clutter.ModifierType.SUPER_MASK);
+        if (state)
+            return Clutter.EVENT_PROPAGATE;
+
+        let target = null;
+        switch (event.get_key_symbol()) {
+        case Clutter.KEY_Left:
+        case Clutter.KEY_KP_Left:
+            target = this._nearest(focus, -1, 0);
+            break;
+        case Clutter.KEY_Right:
+        case Clutter.KEY_KP_Right:
+            target = this._nearest(focus, 1, 0);
+            break;
+        case Clutter.KEY_Up:
+        case Clutter.KEY_KP_Up:
+            target = this._nearest(focus, 0, -1);
+            break;
+        case Clutter.KEY_Down:
+        case Clutter.KEY_KP_Down:
+            target = this._nearest(focus, 0, 1);
+            break;
+        case Clutter.KEY_Tab:
+            target = this._step(focus, 1);
+            break;
+        case Clutter.KEY_ISO_Left_Tab:
+            target = this._step(focus, -1);
+            break;
+        default:
+            return Clutter.EVENT_PROPAGATE;
+        }
+        if (target && target !== focus)
+            target.grab_key_focus();
+        // Handled either way: the Shell's own navigation would jump
+        // elsewhere, or do nothing, for the same key.
+        return Clutter.EVENT_STOP;
+    }
+
+    // Every preview of the active workspace of every monitor, with its
+    // center on the stage and the monitor it belongs to.
+    _previews() {
+        const views = Main.overview._overview?.controls?._workspacesDisplay?._workspacesViews ?? [];
+        const found = [];
+        views.forEach((view, monitor) => {
+            const workspace = view?.getActiveWorkspace?.();
+            if (!workspace)
+                return;
+            const walk = actor => {
+                if (actor instanceof WindowPreview) {
+                    if (!actor.mapped || !actor.visible)
+                        return;
+                    const r = actor.get_transformed_extents();
+                    found.push({
+                        preview: actor, monitor,
+                        x: r.origin.x + r.size.width / 2,
+                        y: r.origin.y + r.size.height / 2,
+                    });
+                    return;
+                }
+                for (const child of actor.get_children())
+                    walk(child);
+            };
+            walk(workspace);
+        });
+        return found;
+    }
+
+    // The closest preview in the direction (dx, dy): distance along the
+    // direction, plus the sideways offset counted twice so a neighbor in
+    // line wins over a nearer one off to the side.
+    _nearest(from, dx, dy) {
+        const all = this._previews();
+        const here = all.find(p => p.preview === from);
+        if (!here)
+            return null;
+        let best = null;
+        let bestScore = Infinity;
+        for (const p of all) {
+            if (p.preview === from)
+                continue;
+            const along = (p.x - here.x) * dx + (p.y - here.y) * dy;
+            if (along < 1)
+                continue;
+            const across = Math.abs((p.x - here.x) * dy) + Math.abs((p.y - here.y) * dx);
+            const score = along + 2 * across;
+            if (score < bestScore) {
+                bestScore = score;
+                best = p.preview;
+            }
+        }
+        return best;
+    }
+
+    // Tab order: monitor by monitor, left to right, then top to bottom.
+    _step(from, delta) {
+        const all = this._previews().sort((a, b) =>
+            a.monitor - b.monitor || a.x - b.x || a.y - b.y);
+        const index = all.findIndex(p => p.preview === from);
+        if (index < 0 || all.length < 2)
+            return null;
+        return all[(index + delta + all.length) % all.length].preview;
+    }
+
+    destroy() {
+        if (this._eventId)
+            global.stage.disconnect(this._eventId);
+        this._eventId = 0;
+    }
+}
+
 export default class Glow extends Extension {
     enable() {
         this._glow = CFG.cornerRadius > 0 ? new RoundGlow() : new FrameGlow();
@@ -1385,6 +1522,15 @@ export default class Glow extends Extension {
             }
         }
 
+        if (CFG.previewKeys) {
+            try {
+                this._navigator = new PreviewNavigator();
+            } catch (e) {
+                console.warn(`Glow: overview key navigation disabled: ${e.message}`);
+                this._navigator = null;
+            }
+        }
+
         this._focusHandlerId = global.display.connect(
             'notify::focus-window',
             () => this._onFocusChanged()
@@ -1419,6 +1565,8 @@ export default class Glow extends Extension {
         this._warmer = null;
         this._ring?.destroy();
         this._ring = null;
+        this._navigator?.destroy();
+        this._navigator = null;
         this._disk?.destroy();
         this._disk = null;
         if (this._tintId)
