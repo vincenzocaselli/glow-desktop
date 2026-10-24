@@ -25,7 +25,8 @@ import St from 'gi://St';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
-import {WindowIcon} from 'resource:///org/gnome/shell/ui/altTab.js';
+import {WindowIcon, WindowSwitcherPopup} from 'resource:///org/gnome/shell/ui/altTab.js';
+import * as SwitcherPopup from 'resource:///org/gnome/shell/ui/switcherPopup.js';
 import {WindowPreview} from 'resource:///org/gnome/shell/ui/windowPreview.js';
 import { loadInterfaceXML } from 'resource:///org/gnome/shell/misc/fileUtils.js';
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
@@ -161,6 +162,11 @@ const CFG = {
     // at 128, a postage stamp on a 1080p screen. The list scrolls when the
     // items no longer fit. 0 keeps the Shell's size.
     switcherPreviewSize: 256,
+
+    // Lay the Alt+Tab previews in rows, as many columns as fit the screen,
+    // so every window stays in sight; the Shell keeps one row and scrolls
+    // it. Up and Down move by a row. false keeps the Shell's list.
+    switcherRows: true,
 };
 
 // -------------------- FrameGlow --------------------
@@ -1501,6 +1507,194 @@ class SwitcherPreviews {
     }
 }
 
+// -------------------- GridWindowSwitcher --------------------
+// The Shell's Alt+Tab list keeps its previews in one row and scrolls it
+// when they no longer fit, so with many windows most are out of sight.
+// This list is the Shell's WindowSwitcher with the items in rows: as
+// many columns as fit the width the popup offers, every cell the size of
+// the largest item, the title of the selected window below. The row
+// scroll view of the base class stays empty and hidden.
+const GridWindowSwitcher = GObject.registerClass(
+class GridWindowSwitcher extends SwitcherPopup.SwitcherList {
+    _init(windows, mode) {
+        super._init(true);
+        this._scrollView.hide();
+        this._leftArrow.hide();
+        this._rightArrow.hide();
+
+        this._flow = new Clutter.FlowLayout({
+            orientation: Clutter.Orientation.HORIZONTAL,
+            homogeneous: true,
+        });
+        this._grid = new St.Widget({
+            style_class: 'switcher-list-item-container',
+            layout_manager: this._flow,
+        });
+        this._grid.connect('style-changed', () => {
+            const spacing = this._grid.get_theme_node().get_length('spacing');
+            this._flow.column_spacing = spacing;
+            this._flow.row_spacing = spacing;
+        });
+        this.add_child(this._grid);
+
+        this._label = new St.Label({
+            x_align: Clutter.ActorAlign.CENTER,
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+        this.add_child(this._label);
+
+        this.windows = windows;
+        this.icons = [];
+        this.columns = 1;
+        this._availableWidth = -1;
+
+        for (const win of windows) {
+            const icon = new WindowIcon(win, mode);
+            this.addItem(icon, icon.label);
+            this.icons.push(icon);
+            icon.window.connectObject('unmanaged',
+                window => this._removeWindow(window), this);
+        }
+        this.connect('destroy',
+            () => this.icons.forEach(icon => icon.window.disconnectObject(this)));
+    }
+
+    addItem(item, label) {
+        const box = super.addItem(item, label);
+        this._list.remove_child(box);
+        this._grid.add_child(box);
+        return box;
+    }
+
+    // Items are square: the largest side of the largest item.
+    _cellSize() {
+        let size = 0;
+        for (const item of this._items) {
+            const [, w] = item.get_preferred_width(-1);
+            const [, h] = item.get_preferred_height(-1);
+            size = Math.max(size, w, h);
+        }
+        return size;
+    }
+
+    _columnsFor(width) {
+        const n = this._items.length;
+        if (n === 0 || width < 0)
+            return Math.max(1, n);
+        const cell = this._cellSize();
+        const spacing = this._flow.column_spacing;
+        return Math.max(1, Math.min(n,
+            Math.floor((width + spacing) / (cell + spacing))));
+    }
+
+    // The popup asks the height for the monitor width first, then the
+    // width for that height: the column count comes from the first call.
+    vfunc_get_preferred_height(forWidth) {
+        const themeNode = this.get_theme_node();
+        this._availableWidth = forWidth > 0 ? themeNode.adjust_for_width(forWidth) : -1;
+        this.columns = this._columnsFor(this._availableWidth);
+        const cell = this._cellSize();
+        const rows = Math.ceil(this._items.length / this.columns);
+        const gridHeight = rows * cell + (rows - 1) * this._flow.row_spacing;
+        const bottom = themeNode.get_padding(St.Side.BOTTOM);
+        const [labelMin, labelNat] = this._label.get_preferred_height(-1);
+        return themeNode.adjust_preferred_height(
+            gridHeight + labelMin + bottom, gridHeight + labelNat + bottom);
+    }
+
+    vfunc_get_preferred_width(_forHeight) {
+        const themeNode = this.get_theme_node();
+        const cell = this._cellSize();
+        // 1px of slack keeps the flow layout from dropping a column.
+        const width = this.columns * cell + (this.columns - 1) * this._flow.column_spacing + 1;
+        return themeNode.adjust_preferred_width(width, width);
+    }
+
+    vfunc_allocate(box) {
+        this.set_allocation(box);
+        const themeNode = this.get_theme_node();
+        const content = themeNode.get_content_box(box);
+        const [, labelHeight] = this._label.get_preferred_height(-1);
+        const bottom = themeNode.get_padding(St.Side.BOTTOM);
+
+        const gridBox = new Clutter.ActorBox();
+        gridBox.x1 = content.x1;
+        gridBox.x2 = content.x2;
+        gridBox.y1 = content.y1;
+        gridBox.y2 = Math.max(content.y1, content.y2 - labelHeight - bottom);
+        this._grid.allocate(gridBox);
+
+        const labelBox = new Clutter.ActorBox();
+        labelBox.x1 = content.x1;
+        labelBox.x2 = content.x2;
+        labelBox.y2 = content.y2;
+        labelBox.y1 = labelBox.y2 - labelHeight;
+        this._label.allocate(labelBox);
+    }
+
+    // The base class also scrolls its row here; nothing scrolls in a grid.
+    highlight(index, justOutline) {
+        const previous = this._items[this._highlighted];
+        if (previous) {
+            previous.remove_style_pseudo_class('selected');
+            previous.remove_style_pseudo_class('highlighted');
+        }
+        const item = this._items[index];
+        if (item)
+            item.add_style_pseudo_class(justOutline ? 'highlighted' : 'selected');
+        this._highlighted = index;
+        this._label.set_text(index === -1 ? '' : this.icons[index].label.text);
+    }
+
+    _removeWindow(window) {
+        const index = this.icons.findIndex(icon => icon.window === window);
+        if (index === -1)
+            return;
+        this.icons.splice(index, 1);
+        this.removeItem(index);
+    }
+});
+
+// -------------------- SwitcherRows --------------------
+// Puts GridWindowSwitcher in the Shell's Alt+Tab popup in place of its
+// row, and gives Up and Down a meaning: one row up or down.
+class SwitcherRows {
+    constructor() {
+        const proto = WindowSwitcherPopup.prototype;
+        this._init = proto._init;
+        this._keyPressHandler = proto._keyPressHandler;
+        const init = this._init;
+        const keyPressHandler = this._keyPressHandler;
+
+        proto._init = function (...args) {
+            init.apply(this, args);
+            const row = this._switcherList;
+            const windows = row.windows;
+            row.destroy();
+            const mode = this._settings.get_enum('app-icon-mode');
+            this._switcherList = new GridWindowSwitcher(windows, mode);
+            this._items = this._switcherList.icons;
+        };
+
+        proto._keyPressHandler = function (keysym, action) {
+            const columns = this._switcherList.columns ?? 0;
+            if (columns > 0 && (keysym === Clutter.KEY_Up || keysym === Clutter.KEY_Down)) {
+                const delta = keysym === Clutter.KEY_Down ? columns : -columns;
+                const index = this._selectedIndex + delta;
+                if (index >= 0 && index < this._items.length)
+                    this._select(index);
+                return Clutter.EVENT_STOP;
+            }
+            return keyPressHandler.call(this, keysym, action);
+        };
+    }
+
+    destroy() {
+        WindowSwitcherPopup.prototype._init = this._init;
+        WindowSwitcherPopup.prototype._keyPressHandler = this._keyPressHandler;
+    }
+}
+
 export default class Glow extends Extension {
     enable() {
         this._glow = CFG.cornerRadius > 0 ? new RoundGlow() : new FrameGlow();
@@ -1568,6 +1762,15 @@ export default class Glow extends Extension {
             }
         }
 
+        if (CFG.switcherRows) {
+            try {
+                this._switcherRows = new SwitcherRows();
+            } catch (e) {
+                console.warn(`Glow: Alt+Tab rows disabled: ${e.message}`);
+                this._switcherRows = null;
+            }
+        }
+
         if (CFG.previewKeys) {
             try {
                 this._navigator = new PreviewNavigator();
@@ -1615,6 +1818,8 @@ export default class Glow extends Extension {
         this._navigator = null;
         this._switcher?.destroy();
         this._switcher = null;
+        this._switcherRows?.destroy();
+        this._switcherRows = null;
         this._disk?.destroy();
         this._disk = null;
         if (this._tintId)
