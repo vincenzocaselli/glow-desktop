@@ -37,6 +37,9 @@ every monitor, where the Shell stops at the primary one (`previewRing` and
 Alt+Tab draws its previews at 256px instead of the Shell's 128 and lays
 them in rows, as many columns as fit the screen, so every window stays in
 sight; Up and Down move by a row (`switcherPreviewSize` and `switcherRows`).
+Each preview is painted at four times its size into an offscreen buffer and
+halved twice, so the texture is averaged instead of sampled and the grain
+of a one-step scale-down is gone (`switcherPreviewSupersample`).
 
 The Bluetooth indicator in the top bar is drawn in Dodger Blue
 (`bluetoothColor` in `extension.js`; `null` keeps the panel's text color).

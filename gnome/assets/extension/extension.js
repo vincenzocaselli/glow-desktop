@@ -163,6 +163,14 @@ const CFG = {
     // items no longer fit. 0 keeps the Shell's size.
     switcherPreviewSize: 256,
 
+    // A preview is the window texture scaled down in one step, and the
+    // GPU samples a few texels per pixel of the result: text turns to
+    // grain. With 4 the clone is painted at four times the preview size
+    // into an offscreen buffer, then halved twice, each halving an exact
+    // average of 2x2 pixels. A power of two; 1 keeps the Shell's single
+    // step.
+    switcherPreviewSupersample: 4,
+
     // Lay the Alt+Tab previews in rows, as many columns as fit the screen,
     // so every window stays in sight; the Shell keeps one row and scrolls
     // it. Up and Down move by a row. false keeps the Shell's list.
@@ -1487,6 +1495,7 @@ class SwitcherPreviews {
         this._init = proto._init;
         const init = this._init;
         const size = CFG.switcherPreviewSize;
+        const supersample = 2 ** Math.round(Math.log2(Math.max(1, CFG.switcherPreviewSupersample)));
         proto._init = function (...args) {
             init.apply(this, args);
             const clone = this._icon?.get_children().find(c => c instanceof Clutter.Clone);
@@ -1497,7 +1506,39 @@ class SwitcherPreviews {
             if (w < 1 || h < 1)
                 return;
             const scale = Math.min(1, px / w, px / h);
-            clone.set_size(w * scale, h * scale);
+            const width = Math.round(w * scale);
+            const height = Math.round(h * scale);
+            // Mipmaps of the window texture, when mutter has them off.
+            clone.source.get_texture?.()?.set_create_mipmaps?.(true);
+            if (supersample > 1 && scale < 1) {
+                // The clone paints at supersample times the size into an
+                // offscreen buffer; each holder halves what it contains,
+                // through a buffer of its own until the last one.
+                this._icon.remove_child(clone);
+                clone.set_size(width * supersample, height * supersample);
+                clone.offscreen_redirect = Clutter.OffscreenRedirect.ALWAYS;
+                let actor = clone;
+                for (let factor = supersample / 2; factor >= 1; factor /= 2) {
+                    const holder = new Clutter.Actor({
+                        width: width * factor,
+                        height: height * factor,
+                    });
+                    if (factor > 1)
+                        holder.offscreen_redirect = Clutter.OffscreenRedirect.ALWAYS;
+                    actor.set_position(0, 0);
+                    actor.set_pivot_point(0, 0);
+                    actor.set_scale(0.5, 0.5);
+                    holder.add_child(actor);
+                    actor = holder;
+                }
+                actor.x_align = Clutter.ActorAlign.CENTER;
+                actor.y_align = Clutter.ActorAlign.CENTER;
+                actor.x_expand = true;
+                actor.y_expand = true;
+                this._icon.insert_child_at_index(actor, 0);
+            } else {
+                clone.set_size(width, height);
+            }
             this._icon.set_size(px, px);
         };
     }
