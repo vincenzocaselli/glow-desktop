@@ -1,9 +1,9 @@
 {
     "uuid": "glow@nebula.local",
     "name": "Glow",
-    "description": "Draws a soft colored aura around the currently focused window rounds the corners of every window, 12px on all four, and gives Alt+Tab large previews laid in rows. Works with any application — GTK, Electron, Qt, SWT — because it runs at the compositor level. On laptops it also shows a battery icon in the style of Windows 11, the remaining time on hover, and a compact free-space indicator. Everything is configurable in extension.js.",
+    "description": "Draws a soft colored aura around the currently focused window, rounds the corners of every window, 12px on all four, gives Alt+Tab large previews laid in rows, and follows the light or dark style of the desktop. Works with any application — GTK, Electron, Qt, SWT — because it runs at the compositor level. On laptops it also shows a battery icon in the style of Windows 11, the remaining time on hover, and a compact free-space indicator. Everything is configurable in extension.js.",
     "shell-version": ["45", "46", "47", "48", "49", "50", "51", "52"],
     "url": "https://github.com/vincenzocaselli/glow-desktop",
-    "version": 8,
-    "version-name": "1.1.0"
+    "version": 9,
+    "version-name": "1.2.0"
 }
