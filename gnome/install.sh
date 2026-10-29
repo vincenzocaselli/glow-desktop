@@ -6,10 +6,12 @@
 #   1. focus-glow     — GNOME Shell extension: blue aura around
 #                       the active window (works on every app,
 #                       GTK / Electron / SWT / Qt — any toolkit)
-#   2. theme-tweaks   — GTK3+GTK4 CSS: square top corners on all
-#                       windows + Dodger Blue accent everywhere
+#   2. theme-tweaks   — GTK3+GTK4 CSS: rounded corners on all
+#                       windows + Dodger Blue accent everywhere,
+#                       on the light and the dark theme
 #   3. yellow-folders — Papirus icon theme with yellow folders,
-#                       including the list-view colorize fix
+#                       including the list-view colorize fix,
+#                       light and dark
 #   4. nemo-icon      — replaces Nemo's grey drawer icon in the
 #                       taskbar / app menu with a yellow folder
 #   5. nemo-zoom      — compact default zoom for Nemo (icon /
@@ -137,6 +139,8 @@ ${YELLOW}Next step — log out and back in.${NC}
     enable it from the Extensions app.
   - Rounded corners, Dodger Blue accent, yellow folders, and the
     yellow Nemo icon are all active immediately.
+  - Light or dark: pick the style in Settings > Appearance or with
+    the Dark Style toggle; Glow follows it.
 
 ${DIM}If the Glow extension does not appear after login, run:${NC}
   gnome-extensions enable glow@nebula.local

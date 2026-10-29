@@ -1,7 +1,8 @@
 # Glow
 
 A soft colored aura around the focused window in GNOME Shell, plus a coherent
-set of theme tweaks for a unified Dodger Blue + yellow-folders look.
+set of theme tweaks for a unified Dodger Blue + yellow-folders look, in a
+light and a dark version that follow the desktop's style.
 
 Designed for **Zorin OS 18** and any GNOME-based desktop running GNOME 45–52.
 
@@ -44,6 +45,11 @@ of a one-step scale-down is gone (`switcherPreviewSupersample`).
 The Bluetooth indicator in the top bar is drawn in Dodger Blue
 (`bluetoothColor` in `extension.js`; `null` keeps the panel's text color).
 
+The extension also follows the desktop's style: when it changes between
+light and dark, the Glow GTK theme, icon theme, and Shell theme of the new
+style go in place. See [Light and dark](#light-and-dark) (`followStyle` in
+`extension.js`).
+
 A small stylesheet tightens the tray: icons sit about 24px apart instead of
 36px. On Zorin it turns off the tray's compact mode, whose inline padding
 would override the stylesheet; `--remove` restores the previous setting.
@@ -61,7 +67,9 @@ On laptops the same extension also restyles the battery in the top bar:
   proportional to the charge: light green, amber at 20% and below, red at 10%
   and below. The percentage is written inside in bold, followed by a smaller
   `%`, in the panel's text color: the fills are light enough to keep it
-  readable. When the charger is plugged in, a yellow bolt with a thin dark
+  readable. On a panel with light text (the dark style, or a black panel)
+  the fills are dark versions of the same colors, so white digits read on
+  them. When the charger is plugged in, a yellow bolt with a thin dark
   outline appears inside, before the digits. The digits never shrink: the
   icon widens when the bolt or a third digit needs the room
 - **Remaining time on hover** — resting the pointer on the battery icon shows
@@ -70,7 +78,11 @@ On laptops the same extension also restyles the battery in the top bar:
 - On machines without a battery, nothing changes
 
 ### 2. `theme-tweaks`
-GTK3 + GTK4 CSS overrides:
+GTK3 + GTK4 CSS overrides. The CSS takes its surface and text colors from
+the GTK theme, and the tints that differ by style (title bar, selection,
+and their text colors) from the theme copies the module builds, so one block
+serves the light and the dark theme and follows a switch between them, in
+running apps too:
 
 - **Rounded window corners, 12px on all four** — GNOME rounds the top
   corners only on frames drawn by the window manager; Glow gives GTK 3,
@@ -80,33 +92,60 @@ GTK3 + GTK4 CSS overrides:
 - **Dodger Blue accent everywhere** — selected rows, checked toggles,
   breadcrumbs, switches, progress bars, calendars, menu hovers — every accent
   state matches the focus-glow color
-- **Glass selection** — selected rows, checked buttons, the current directory
-  in the path bar, menu items under the pointer, and the selected calendar day
-  are translucent and rounded, in focused and unfocused windows alike.
-  Selected text uses a lighter glass, so it stays readable. In Nemo (GTK3), a thin gap separates adjacent
+- **Solid, rounded selection** — selected rows, checked buttons, the current
+  directory in the path bar, menu items under the pointer, and the selected
+  calendar day are Dodger Blue with white text, rounded, in focused and
+  unfocused windows alike: the accent itself on the light theme, 80% of it
+  over the dark surface (`#207bd4`). Selected text gets the same solid accent
+  and white text. In Nemo (GTK3), a thin gap separates adjacent
   selected rows. In Files (GTK4) the rows touch, because a gap would shift
-  the rows
-- **White backgrounds (GTK4)** — windows, title bars, and sidebars are white,
-  with or without focus, instead of the theme's blue-gray and gray. Applies to
-  every GTK4 / libadwaita app, not just Files
+  the rows. `LIGHT_GLASS_PCT` and `DARK_GLASS_PCT` in `modules/theme-tweaks.sh`
+  set the strength; a paler selection (50, say) gets the theme's text color
+  instead of white
+- **One surface color (GTK4)** — windows, title bars, and sidebars take the
+  theme's view background (white on the light theme, `#262626` on the dark
+  one), with or without focus, instead of the theme's blue-gray and gray.
+  Applies to every GTK4 / libadwaita app, not just Files
 - **Same selection in Eclipse** — Eclipse (SWT) reads its selection colors
-  from the GTK theme file, not from `gtk.css`. The module activates
-  `<theme>-Glow`, a copy of the current theme that only replaces the
-  selection colors with the opaque equivalent of the glass (`#8fc8ff`). It is
-  a copy, not an import: flatpak apps see `~/.themes` but not
-  `/usr/share/themes`, and a theme that fails to import leaves their GTK
-  dialogs without a background
-- **Light blue title bar** — the focused window's title bar is light blue
-  (`#c7e3ff`, Dodger Blue at 25% over white), the others stay white. Covers
-  GTK3, GTK4, and the title bars the window manager draws for apps such as
-  Nemo and Eclipse; those update after logging out and back in
+  from the GTK theme file, not from `gtk.css`. The module builds
+  `<Theme>-Glow-Light` and `<Theme>-Glow-Dark`, copies of the light and the
+  dark variant of the current theme that carry Glow's tints as named colors
+  and replace the selection colors with the opaque selection (`#1e90ff` on
+  the light theme, `#207bd4` on the dark surface, white text on both), and
+  activates the one of the current style. They are copies, not imports: flatpak apps see
+  `~/.themes` but not `/usr/share/themes`, and a theme that fails to import
+  leaves their GTK dialogs without a background
+- **Neutral dark theme** — on Zorin OS the dark copy is built from
+  `ZorinGrey-Dark`, neutral dark gray with white text as in Windows 11,
+  where `ZorinBlue-Dark` tints its text and accents a pale blue. Its greys
+  are lifted a little: `#262626` views and `#323232` windows instead of
+  `#1b1b1b` and `#2a2a2a`, a black that is less harsh next to the glow
+  (`DARK_LIFT` in `modules/theme-tweaks.sh`; 0 keeps the source's greys).
+  The accents stay Dodger Blue, stronger than on the light theme so they
+  carry on the dark surface: title bar and selection both at 80%, the same
+  blue (`DARK_TITLE_PCT`, `DARK_GLASS_PCT`). `GLOW_DARK_THEME` picks another
+  source: `GLOW_DARK_THEME=ZorinBlue-Dark bash install.sh theme-tweaks`
+  keeps the tinted one
+- **Accent title bar** — the focused window's title bar is Dodger Blue with
+  a white title and white window buttons (`#1e90ff` on the light theme;
+  `#207bd4`, 80% over the dark surface, on the dark one), the others keep
+  the surface color and the theme's text. A 1px lighter rim runs 1px
+  inside the edge of the blue bar and follows the rounded corners
+  (`glow_titlebar_rim_color` in the CSS, white at 70%). Checked buttons and
+  the current directory in a title bar get a translucent white chip, so
+  they still stand out on the blue. Covers GTK3, GTK4, and the title bars the window
+  manager draws for apps such as Nemo and Eclipse; those update after
+  logging out and back in. `LIGHT_TITLE_PCT` and `DARK_TITLE_PCT` in
+  `modules/theme-tweaks.sh` set the strength; a pale tint (25, say) gets
+  the theme's text color instead of white
 - **Window buttons in the style of Windows 11** — minimize, maximize, and
   close become wide flat buttons with thin line icons, a light gray hover,
   and a red close button on hover. Similar to Windows 11, not a copy: the
   icons are drawn for Glow and the buttons keep slightly rounded corners
-- **Light gray dividers (GTK4)** — thin `#dedede` lines below the title bars,
-  between the sidebar and the content, and between list column headers, so
-  the areas stay distinct on white
+- **Thin dividers (GTK4)** — thin lines below the title bars, between the
+  sidebar and the content, and between list column headers, so the areas
+  stay distinct on one surface color: the surface moved 13% toward the text
+  color (`#e0e4e9` on white, `#424242` on the dark surface)
 - **Sidebar icons at full strength (GTK4)** — the theme dims sidebar icons to
   70%, which washes out the color icons of `yellow-folders`
 - **Compact taskbar (Zorin OS)** — lowers the Zorin taskbar from 48 to 42px.
@@ -125,11 +164,13 @@ Installs the **Papirus** icon theme with yellow folders.
   small-size icon directories (16, 22, 24, 32, 48 px), so Nemo / Files show
   yellow folders even in list view at standard zoom (Papirus serves symbolic
   monochrome icons at those sizes by default)
-- **Color sidebar icons** — builds **Papirus-Light-Glow**, a theme that
-  inherits Papirus-Light and replaces the monochrome sidebar icons of Nemo and
-  Files (folders, trash, drives) with color ones. Dialog icons stay monochrome.
-  The theme needs `python3-gi`: without it, the module falls back to
-  Papirus-Light.
+- **Color sidebar icons** — builds **Papirus-Light-Glow** and
+  **Papirus-Dark-Glow**, themes that inherit Papirus-Light and Papirus-Dark
+  and replace the monochrome sidebar icons of Nemo and Files (folders, trash,
+  drives) with color ones. Dialog icons stay monochrome. The one of the
+  current style is activated; the dark one draws its monochrome icons in
+  light gray, for the dark theme. The themes need `python3-gi`: without it,
+  the module falls back to Papirus-Light and Papirus-Dark.
 - **Favorites star** — Nemo's Favorites gets the yellow Papirus bookmark star
   instead of a dark one
 - **Tray icons** — a cleaner eject icon (rounded triangle and bar, sharp at
@@ -141,8 +182,7 @@ Installs the **Papirus** icon theme with yellow folders.
   replaces the top bar's Wi-Fi icons (a fan of arcs, with the levels not
   reached shown faint) and volume icons (a speaker with one to three waves,
   a cross when muted). They are symbolic, so they take the panel's text color
-- Forces the light variant even when the desktop is in dark mode, so folders
-  stay yellow
+- Folders are yellow in the light and in the dark variant alike
 
 ### 4. `nemo-icon`
 Overrides Nemo's default grey "drawer" icon in the taskbar / app menu with a
@@ -162,6 +202,42 @@ sidebar).
 - Clears stale per-folder metadata so previously-visited folders don't keep
   old larger-zoom overrides
 - `--remove` resets the three zoom defaults to their schema defaults
+
+## Light and dark
+
+Glow has a light and a dark version, and the desktop's style chooses
+between them: **Settings → Appearance → Style**, the **Dark Style** toggle
+in the quick settings, or **Zorin Appearance → Light / Dark**. All three
+write the `color-scheme` setting; the Glow extension watches it and, when it
+changes, puts the GTK theme (`<Theme>-Glow-Light` or `<Theme>-Glow-Dark`),
+the icon theme (`Papirus-Light-Glow` or `Papirus-Dark-Glow`), and the Shell
+theme of the new style (`ZorinGrey-Dark` for the dark one on Zorin, neutral
+like the GTK copy) in place. The GTK CSS needs no change: it takes its
+colors from the theme, so open apps switch with it. Zorin's day and night
+schedule works the same way, with the Glow copies as its day and night
+themes.
+
+The installer applies the style in use at install time. Without the
+extension (only `theme-tweaks` or `yellow-folders` installed), re-run them
+after changing the style:
+
+```bash
+bash install.sh theme-tweaks
+bash install.sh yellow-folders
+```
+
+To switch from the terminal:
+
+```bash
+gsettings set org.gnome.desktop.interface color-scheme prefer-dark   # dark
+gsettings set org.gnome.desktop.interface color-scheme default       # light
+```
+
+The dark copy is named after the dark variant of the GTK theme in use
+(`ZorinBlue-Glow-Dark` for `ZorinBlue-Light`, the name Zorin's toggle
+expects) and built from `ZorinGrey-Dark` on Zorin, or from that variant
+elsewhere; with a theme that has no dark variant installed, Glow stays
+light.
 
 ## Installation
 
@@ -214,9 +290,12 @@ updates files in place rather than duplicating them.
 - Same block in `~/.config/gtk-3.0/gtk.css`
 - Pre-existing user CSS in those files is preserved
 - Copies the window button icons to `~/.config/gtk-{3,4}.0/glow/`
-- Creates `~/.themes/<theme>-Glow/` (a copy of the theme, about 1.6 MB) and sets
-  it as the GTK theme (also as the Zorin day theme, when present)
-- State file in `~/.config/glow/theme-tweaks.state` (used by `--remove`)
+- Creates `~/.themes/<Theme>-Glow-Light/` and `~/.themes/<Theme>-Glow-Dark/`
+  (copies of the two variants of the theme, about 1.6 MB each) and sets the
+  one of the current style as the GTK theme (also as the Zorin day and night
+  themes, when present)
+- State file in `~/.config/glow/theme-tweaks.state` (used by `--remove` and
+  by the extension when the style changes)
 - On Zorin OS, sets `org.gnome.shell.extensions.zorin-taskbar panel-size` to
   42; the previous value is saved in `~/.config/glow/taskbar.state`
 
@@ -226,10 +305,11 @@ updates files in place rather than duplicating them.
 - Modifies small-size folder SVGs in
   `/usr/share/icons/Papirus{,-Light,-Dark}/<size>/places/` (full backup at
   `/usr/share/icons/_glow-colorize-backup/`)
-- Creates the `Papirus-Light-Glow` theme in
-  `~/.local/share/icons/Papirus-Light-Glow/`
+- Creates the `Papirus-Light-Glow` and `Papirus-Dark-Glow` themes in
+  `~/.local/share/icons/`
 - Changes `gsettings` `icon-theme` on GNOME and Cinnamon schemas
-- State file in `~/.config/glow/yellow-folders.state` (used by `--remove`)
+- State file in `~/.config/glow/yellow-folders.state` (used by `--remove` and
+  by the extension when the style changes)
 
 ### nemo-icon
 - Creates `~/.local/share/applications/nemo.desktop` (user-level override)
@@ -290,8 +370,12 @@ Open apps pick up the corners when you restart them; the frames drawn by the
 window manager change after you log out and back in.
 
 ### Accent color
-Find / replace `#1e90ff` in `assets/css/gtk4.css` and `assets/css/gtk3.css`,
-then re-run `bash install.sh theme-tweaks`.
+Change `glow_accent_color` at the top of `assets/css/gtk4.css` and
+`assets/css/gtk3.css` and `ACCENT` in `modules/theme-tweaks.sh`, then re-run
+`bash install.sh theme-tweaks`. The module writes the title bar tint and the
+selection, light and dark, into the `-Glow-` theme copies, mixed from
+`ACCENT` at the percentages set next to it, with white text on a selection
+darker than mid-grey and the theme's text color on a paler one.
 
 ### Folder color
 Replace `yellow` in `modules/yellow-folders.sh` (function `apply_yellow_color`)
@@ -325,6 +409,10 @@ the package's CSS, and keep their own internal colors:
   but title bars / selections inside are decided by the app
 - **Sublime Text, Eclipse, JetBrains IDEs** — proprietary toolkits (SWT, Skia)
 - **Qt / KDE apps** — do not read GTK CSS
+- **GTK4 apps on a vanilla GNOME** — libadwaita there ignores the GTK theme,
+  so the `-Glow-` theme copies and the title bar tint do not reach them; the
+  CSS in `~/.config/gtk-4.0/gtk.css` still does. Zorin OS patches libadwaita
+  to follow the GTK theme, so everything applies
 
 The focus-glow extension itself **does work everywhere**, because it runs at
 the Mutter compositor level above all windows.
@@ -340,7 +428,7 @@ glow/
 │   ├── extension/         ← extension.js + metadata.json
 │   ├── css/               ← gtk3.css + gtk4.css
 │   ├── titlebuttons/      ← window button icons (minimize, maximize, restore, close)
-│   └── icons/             ← build-theme.py (Papirus-Light-Glow)
+│   └── icons/             ← build-theme.py (Papirus-Light-Glow, Papirus-Dark-Glow)
 └── modules/
     ├── _lib.sh            ← shared logging helpers
     ├── focus-glow.sh
@@ -359,7 +447,7 @@ bash install.sh --remove
 Removes everything in reverse order:
 - Nemo override
 - Papirus icon backups restored
-- Papirus-Light-Glow theme deleted
+- Papirus-Light-Glow and Papirus-Dark-Glow themes deleted
 - Previous icon theme restored (read from state file)
 - CSS blocks removed (preserving any other user CSS)
 - GNOME Shell extension disabled and deleted

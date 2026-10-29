@@ -19,3 +19,34 @@ headerbar.default-decoration windowcontrols.end > button:last-child {
 headerbar.default-decoration windowcontrols.start > button:first-child {
   border-top-left-radius: 10px;
 }
+
+/* The title bars take the same corners, so the rim that
+   ~/.config/gtk-4.0/gtk.css draws inside their edge follows the curve.
+   The edge two panes of a split view share stays square, and square
+   windows (maximized, tiled, fullscreen) keep square bars. */
+
+headerbar,
+toolbarview > .top-bar {
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+}
+.sidebar-pane toolbarview > .top-bar {
+  border-top-right-radius: 0;
+}
+.content-pane toolbarview > .top-bar {
+  border-top-left-radius: 0;
+}
+window.maximized headerbar,
+window.maximized toolbarview > .top-bar,
+window.fullscreen headerbar,
+window.fullscreen toolbarview > .top-bar,
+window.tiled headerbar,
+window.tiled toolbarview > .top-bar,
+window.tiled-top headerbar,
+window.tiled-top toolbarview > .top-bar,
+window.tiled-left headerbar,
+window.tiled-left toolbarview > .top-bar,
+window.tiled-right headerbar,
+window.tiled-right toolbarview > .top-bar {
+  border-radius: 0;
+}

@@ -18,11 +18,10 @@
 
 ## What it looks like
 
-| | |
+| Light | Dark |
 |---|---|
-| ![Yellow folders in icon and list view](docs/images/gallery-1.png) | ![Focus glow on the active window](docs/images/gallery-2.png) |
-
-![Dodger Blue accent across settings](docs/images/gallery-3.png)
+| ![Light style: yellow folders, Dodger Blue selection and title bar, focus glow](docs/images/gallery-1.png) | ![Dark style: the same look on a neutral dark gray](docs/images/gallery-2.png) |
+| ![Light style: Settings with the accent sidebar and title bar](docs/images/gallery-3.png) | ![Dark style: quick settings with Dodger Blue toggles and sliders](docs/images/gallery-4.png) |
 
 ## The idea
 
@@ -39,6 +38,9 @@ One visual identity, applied consistently across the whole desktop:
   at small sizes in list view (where Papirus normally falls back to
   monochrome symbolic icons).
 - **Compact file manager zoom** — content font size matching the sidebar.
+- **Light and dark** *(GNOME)* — both versions of the look; the desktop's
+  style (Settings → Appearance, the Dark Style toggle) picks one, and Glow
+  follows the switch.
 - **Top bar in the style of Windows 11** *(GNOME)* — a horizontal battery
   icon with a colored fill and the percentage inside, the remaining time on
   hover, and Wi-Fi and volume icons drawn to match.

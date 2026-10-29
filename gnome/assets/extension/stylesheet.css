@@ -45,3 +45,42 @@
   border-radius: 12px;
   background-color: transparent;
 }
+
+/* Glow — Dodger Blue accent in the Shell. The theme paints the checked
+   quick settings toggles, the sliders, the switches, and today's date in
+   its own accent: a cyan on ZorinBlue-Light, white on ZorinGrey-Dark. The
+   glow color instead, so the Shell matches the GTK accent in both styles.
+   The switch is an image in the theme: a Glow one replaces it. */
+.quick-toggle:checked,
+.quick-menu-toggle .quick-toggle-arrow:checked,
+.keyboard-brightness-level .button:checked,
+.calendar .calendar-day.calendar-today {
+  background-color: #1e90ff;
+  background-gradient-direction: none;
+  color: #ffffff;
+}
+.quick-toggle:checked:hover,
+.quick-toggle:focus:checked,
+.quick-menu-toggle .quick-toggle-arrow:checked:hover,
+.quick-menu-toggle .quick-toggle-arrow:focus:checked,
+.calendar .calendar-day.calendar-today:hover,
+.calendar .calendar-day.calendar-today:focus {
+  background-color: #3a9dff;
+  color: #ffffff;
+}
+.quick-toggle:checked:active,
+.quick-menu-toggle .quick-toggle-arrow:checked:active {
+  background-color: #1a7fe6;
+  color: #ffffff;
+}
+.quick-toggle:checked .quick-toggle-subtitle {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.slider {
+  -barlevel-active-background-color: #1e90ff;
+}
+
+.toggle-switch:checked {
+  background-image: url("toggle-on.svg");
+}

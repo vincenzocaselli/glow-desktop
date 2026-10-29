@@ -8,3 +8,27 @@ window.csd,
 window.csd.background {
   border-radius: 12px;
 }
+
+/* The title bars take the same corners, so the rim that
+   ~/.config/gtk-3.0/gtk.css draws inside their edge follows the curve.
+   Square windows (maximized, tiled, fullscreen) keep square bars. */
+
+headerbar,
+.titlebar:not(headerbar) {
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+}
+.maximized headerbar,
+.maximized .titlebar:not(headerbar),
+.fullscreen headerbar,
+.fullscreen .titlebar:not(headerbar),
+.tiled headerbar,
+.tiled .titlebar:not(headerbar),
+.tiled-top headerbar,
+.tiled-top .titlebar:not(headerbar),
+.tiled-left headerbar,
+.tiled-left .titlebar:not(headerbar),
+.tiled-right headerbar,
+.tiled-right .titlebar:not(headerbar) {
+  border-radius: 0;
+}

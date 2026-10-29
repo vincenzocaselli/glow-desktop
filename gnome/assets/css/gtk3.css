@@ -25,15 +25,39 @@ window.csd.background {
 
 /* GLOW-SQUARE-CORNERS-END */
 
+/* ---------- palette ----------
+   Glow's colors, derived from the theme's named colors so that one
+   file serves the light and the dark theme and follows a switch between
+   them in running apps: the surface is the theme's base color (white in
+   ZorinBlue-Light, #262626 in the dark copy) and the text its text color.
+   The tints that differ by style come from the theme copies that
+   theme-tweaks builds (named colors defined there):
+     glow_titlebar_color     title bar of the focused window: the accent
+                             itself on the light theme (#1e90ff), 80% over
+                             the dark surface (#207bd4)
+     glow_titlebar_fg_color  text and window buttons on it: white on these
+                             blues, the theme's text color on a pale tint
+     glow_glass_color        the selection as an opaque color, for apps
+                             that cannot use translucent ones: the accent
+                             itself on the light theme (#1e90ff), 80% on
+                             the dark one (#207bd4)
+     glow_selection_color    the same selection as alpha(accent, pct)
+     glow_selection_fg_color text on the selection: white on these blues,
+                             the theme's text color on a pale glass */
+@define-color glow_accent_color   #1e90ff;
+@define-color glow_surface_color  @theme_base_color;
+@define-color glow_text_color     @theme_fg_color;
+/* Thin lines between areas: the surface moved 13% toward the text. */
+@define-color glow_divider_color  mix(@glow_surface_color, @glow_text_color, 0.13);
+
 /* ---------- Dodger Blue accent ---------- */
 
 /* Apps that paint their own selection (Eclipse / SWT, for example)
-   ask GTK for these two named colors and need them opaque. #8fc8ff
-   is the glass selection (Dodger Blue at 50%) over white, so their
-   selection matches the one GTK draws. The theme itself does not
-   use these names. */
-@define-color theme_selected_bg_color   #8fc8ff;
-@define-color theme_selected_fg_color   @theme_fg_color;
+   ask GTK for these two named colors and need them opaque: the glass
+   selection over the surface, so their selection matches the one GTK
+   draws. The theme itself does not use these names. */
+@define-color theme_selected_bg_color   @glow_glass_color;
+@define-color theme_selected_fg_color   @glow_selection_fg_color;
 
 /* --- list / tree / grid / icon view selection --- */
 row:selected,
@@ -45,7 +69,7 @@ iconview:selected,
 .sidebar row:selected,
 placessidebar row:selected,
 flowbox flowboxchild:selected {
-  background-color: #1e90ff;
+  background-color: @glow_accent_color;
   color: #ffffff;
 }
 
@@ -58,7 +82,7 @@ togglebutton:checked,
 .linked > button:checked,
 headerbar button:checked,
 .titlebar button:checked {
-  background-color: #1e90ff;
+  background-color: @glow_accent_color;
   color: #ffffff;
 }
 
@@ -69,7 +93,7 @@ NemoPathBar button:checked,
 NemoPathBar button.current-dir,
 pathbar button:checked,
 pathbar button.current-dir {
-  background-color: #1e90ff;
+  background-color: @glow_accent_color;
   color: #ffffff;
 }
 
@@ -97,7 +121,7 @@ NemoPathBar button.current-dir:backdrop,
 pathbar button:checked:backdrop,
 pathbar button.current-dir:backdrop,
 button.suggested-action:backdrop {
-  background-color: #1e90ff;
+  background-color: @glow_accent_color;
   color: #ffffff;
 }
 
@@ -112,7 +136,7 @@ pathbar button.current-dir:backdrop label {
   color: #ffffff;
 }
 
-/* --- text selection: glass, lighter than rows so text stays readable --- */
+/* --- text selection: the same solid accent and white text as the rows --- */
 entry selection,
 entry selection:focus,
 entry selection:backdrop,
@@ -121,28 +145,28 @@ textview selection:focus,
 textview selection:backdrop,
 .entry selection,
 label selection {
-  background-color: rgba(30, 144, 255, 0.35);
-  color: @theme_fg_color;
+  background-color: @glow_accent_color;
+  color: #ffffff;
 }
 
 /* --- selected day in calendars --- */
 calendar:selected,
 calendar.view:selected,
 calendar:selected:backdrop {
-  background-color: rgba(30, 144, 255, 0.50);
+  background-color: @glow_selection_color;
   border-radius: 6px;
-  color: @theme_fg_color;
+  color: @glow_selection_fg_color;
 }
 
 /* --- checks, radios, switches --- */
 check:checked,
 radio:checked {
-  background-color: #1e90ff;
-  border-color: #1e90ff;
+  background-color: @glow_accent_color;
+  border-color: @glow_accent_color;
   color: #ffffff;
 }
 switch:checked {
-  background-color: #1e90ff;
+  background-color: @glow_accent_color;
 }
 switch:checked slider {
   background-color: #ffffff;
@@ -152,40 +176,59 @@ switch:checked slider {
 progressbar progress,
 progressbar > trough > progress,
 levelbar block.filled {
-  background-color: #1e90ff;
+  background-color: @glow_accent_color;
 }
 
-/* --- suggested-action button --- */
+/* --- suggested-action button: the theme paints its own blue on
+   hover and press, so those states need the accent too (the same
+   shades as the Shell's quick settings) --- */
 button.suggested-action {
-  background-color: #1e90ff;
+  background-color: @glow_accent_color;
+  background-image: none;
+  color: #ffffff;
+}
+button.suggested-action:hover {
+  background-color: #3a9dff;
+  background-image: none;
+  color: #ffffff;
+}
+button.suggested-action:active,
+button.suggested-action:checked {
+  background-color: #1a7fe6;
+  background-image: none;
   color: #ffffff;
 }
 
-/* --- menu hover / active: same glass as the selection --- */
+/* --- menu hover / active: same color as the selection. GTK 3 puts
+   a submenu under its parent item in the CSS tree (menuitem > window
+   > menu > menuitem), so a descendant selector like "menuitem:hover
+   label" would also color every label of the open submenu, white on
+   white; the child combinators keep the rules to the item's own
+   label, arrow, and accelerator. --- */
 menuitem:hover,
 menuitem:active,
 .menu menuitem:hover,
 menubar > menuitem:hover {
-  background-color: rgba(30, 144, 255, 0.50);
+  background-color: @glow_selection_color;
   background-image: none;
-  color: @theme_fg_color;
+  color: @glow_selection_fg_color;
 }
 
-menuitem:hover label,
-menuitem:hover arrow,
-.menu menuitem:hover label,
-.menu menuitem:hover arrow,
-menubar > menuitem:hover label {
-  color: @theme_fg_color;
+menuitem:hover > label,
+menuitem:hover > arrow,
+menuitem:hover > box > label,
+menuitem:hover > box > arrow {
+  color: @glow_selection_fg_color;
 }
 
-menuitem:hover accelerator,
-.menu menuitem:hover accelerator {
-  color: alpha(@theme_fg_color, 0.55);
+menuitem:hover > label > accelerator,
+menuitem:hover > box > label > accelerator {
+  color: alpha(@glow_selection_fg_color, 0.55);
 }
 
-/* ---------- glass selection ----------
-   Translucent, rounded selection with a gap between adjacent rows.
+/* ---------- rounded selection ----------
+   Rounded selection with a gap between adjacent rows, solid on the
+   light theme and 80% glass on the dark one (the theme copy sets it).
    The transparent border makes the gap; background-clip keeps the
    background inside the border, so border-radius rounds the visible
    part. GTK has no backdrop-filter, so there is no blur. */
@@ -196,7 +239,7 @@ treeview.view:selected:hover,
 iconview:selected,
 iconview:selected:focus,
 iconview:selected:hover {
-  background-color: rgba(30, 144, 255, 0.50);
+  background-color: @glow_selection_color;
   background-image: none;
   background-clip: padding-box;
   border-top: 2px solid transparent;
@@ -204,7 +247,7 @@ iconview:selected:hover {
   border-left: 4px solid transparent;
   border-right: 4px solid transparent;
   border-radius: 6px;
-  color: @theme_fg_color;
+  color: @glow_selection_fg_color;
 }
 
 /* The Nemo sidebar places several narrow cells side by side: a side
@@ -221,7 +264,7 @@ iconview:selected:hover {
    backdrop rule earlier in this file would otherwise win. */
 treeview.view:selected:backdrop,
 iconview:selected:backdrop {
-  background-color: rgba(30, 144, 255, 0.50);
+  background-color: @glow_selection_color;
   background-image: none;
   background-clip: padding-box;
   border-top: 2px solid transparent;
@@ -229,7 +272,7 @@ iconview:selected:backdrop {
   border-left: 4px solid transparent;
   border-right: 4px solid transparent;
   border-radius: 6px;
-  color: @theme_fg_color;
+  color: @glow_selection_fg_color;
 }
 
 .nemo-places-sidebar treeview.view:selected:backdrop {
@@ -249,10 +292,10 @@ placessidebar row:selected,
 placessidebar row:selected:backdrop,
 flowbox flowboxchild:selected,
 flowbox flowboxchild:selected:backdrop {
-  background-color: rgba(30, 144, 255, 0.50);
+  background-color: @glow_selection_color;
   background-image: none;
   border-radius: 6px;
-  color: @theme_fg_color;
+  color: @glow_selection_fg_color;
 }
 
 /* Checked buttons (view mode, sidebar toggle) and the current
@@ -284,10 +327,10 @@ pathbar button:checked,
 pathbar button:checked:backdrop,
 pathbar button.current-dir,
 pathbar button.current-dir:backdrop {
-  background-color: rgba(30, 144, 255, 0.50);
+  background-color: @glow_selection_color;
   background-image: none;
   border-radius: 6px;
-  color: @theme_fg_color;
+  color: @glow_selection_fg_color;
 }
 
 button:checked:backdrop label,
@@ -297,12 +340,12 @@ NemoPathBar button:checked:backdrop label,
 NemoPathBar button.current-dir:backdrop label,
 pathbar button:checked:backdrop label,
 pathbar button.current-dir:backdrop label {
-  color: @theme_fg_color;
+  color: @glow_selection_fg_color;
 }
 
 /* Eclipse (SWT) asks GTK for the selection color of a generic
    .view.cell node and paints it itself, opaque. Give that node the
-   glass selection as an opaque color (Dodger Blue at 50% over white),
+   selection as an opaque color (the accent itself on the light theme),
    so rows Eclipse paints match the rows GTK paints. */
 .view:selected,
 .view:selected:focus,
@@ -310,23 +353,52 @@ pathbar button.current-dir:backdrop label {
 .view.cell:selected,
 .view.cell:selected:focus,
 .view.cell:selected:backdrop {
-  background-color: #8fc8ff;
+  background-color: @glow_glass_color;
   background-image: none;
-  color: @theme_fg_color;
+  color: @glow_selection_fg_color;
 }
 
-/* ---------- light blue title bar on the focused window ----------
-   Same color as in GTK4: Dodger Blue at 25% over white. Unfocused
-   windows keep a white title bar. */
-.titlebar:not(headerbar),
-headerbar {
-  background-color: #c7e3ff;
+/* ---------- accent title bar on the focused window ----------
+   Same color as in GTK4: the accent itself on the light theme, white
+   title and buttons on it. Unfocused windows keep the surface color
+   and the theme's text colors. Checked buttons and the current
+   directory, Dodger Blue elsewhere, get a translucent white chip on
+   the blue bar instead. */
+.titlebar:not(headerbar):not(:backdrop),
+headerbar:not(:backdrop) {
+  background-color: @glow_titlebar_color;
   background-image: none;
+  color: @glow_titlebar_fg_color;
+}
+.titlebar:not(headerbar):not(:backdrop) .title,
+headerbar:not(:backdrop) .title,
+headerbar:not(:backdrop) button:not(.suggested-action):not(.destructive-action) {
+  color: @glow_titlebar_fg_color;
 }
 .titlebar:backdrop:not(headerbar),
 headerbar:backdrop {
-  background-color: #ffffff;
+  background-color: @glow_surface_color;
   background-image: none;
+}
+headerbar:not(:backdrop) button:checked,
+headerbar:not(:backdrop) .path-bar button.current-dir,
+headerbar:not(:backdrop) pathbar button.current-dir {
+  background-color: alpha(@glow_titlebar_fg_color, 0.22);
+  color: @glow_titlebar_fg_color;
+}
+
+/* ---------- rim on the focused title bar ----------
+   A 1px lighter line 1px inside the edge of the blue bar, following
+   the corners of the window (the bars take the 12px corners in
+   gtk3-round.css): a 2px light inset shadow, then a 1px one in the
+   bar's own blue that leaves the gap. GTK paints inset shadows in
+   the order listed, the last on top, unlike CSS. */
+@define-color glow_titlebar_rim_color  alpha(#ffffff, 0.7);
+
+headerbar:not(:backdrop),
+.titlebar:not(headerbar):not(:backdrop) {
+  box-shadow: inset 0 0 0 2px @glow_titlebar_rim_color,
+              inset 0 0 0 1px @glow_titlebar_color;
 }
 
 /* ---------- window buttons in the style of Windows 11 ----------
@@ -355,6 +427,16 @@ headerbar button.titlebutton:not(.appmenu):hover,
 headerbar button.titlebutton:not(.appmenu):active,
 .titlebar button.titlebutton:not(.appmenu):active {
   background-color: alpha(currentColor, 0.14);
+}
+/* On the accent bar the hover has to be stronger to show. The close
+   button keeps its red: these rules outrank the ones above. */
+headerbar:not(:backdrop) button.titlebutton:not(.appmenu):not(.close):hover,
+.titlebar:not(:backdrop) button.titlebutton:not(.appmenu):not(.close):hover {
+  background-color: alpha(currentColor, 0.18);
+}
+headerbar:not(:backdrop) button.titlebutton:not(.appmenu):not(.close):active,
+.titlebar:not(:backdrop) button.titlebutton:not(.appmenu):not(.close):active {
+  background-color: alpha(currentColor, 0.28);
 }
 headerbar button.titlebutton.close:hover,
 .titlebar button.titlebutton.close:hover {

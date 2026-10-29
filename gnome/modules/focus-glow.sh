@@ -19,7 +19,7 @@ TRAY_SCHEMA="org.gnome.shell.extensions.zorin-appindicator"
 TRAY_STATE="$HOME/.config/glow/tray.state"
 
 set_tray_compact_off() {
-    gsettings list-schemas 2>/dev/null | grep -qx "$TRAY_SCHEMA" || return 0
+    gsettings list-schemas 2>/dev/null | grep -x "$TRAY_SCHEMA" >/dev/null || return 0
     if [[ ! -f "$TRAY_STATE" ]]; then
         mkdir -p "$(dirname "$TRAY_STATE")"
         gsettings get "$TRAY_SCHEMA" compact-mode-enabled > "$TRAY_STATE"
@@ -45,6 +45,7 @@ case "$cmd" in
         cp "$SRC_DIR/extension.js"  "$EXT_DIR/extension.js"
         cp "$SRC_DIR/metadata.json" "$EXT_DIR/metadata.json"
         cp "$SRC_DIR/stylesheet.css" "$EXT_DIR/stylesheet.css"
+        cp "$SRC_DIR/toggle-on.svg" "$EXT_DIR/toggle-on.svg"
         ok "Extension files copied → $EXT_DIR"
         set_tray_compact_off
 

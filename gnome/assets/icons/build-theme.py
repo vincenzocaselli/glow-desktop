@@ -1,20 +1,24 @@
 #!/usr/bin/env python3
 # ============================================================
-# Glow — builds the Papirus-Light-Glow icon theme
+# Glow — builds the Papirus-Light-Glow and Papirus-Dark-Glow
+# icon themes
 #
 # Papirus serves the sidebar icons of Nemo and Files as
-# symbolic (monochrome) SVGs. This theme inherits Papirus-Light
-# and overrides those names with color PNGs rendered from the
-# Papirus 24x24 icons, so folders stay yellow in the sidebar too.
+# symbolic (monochrome) SVGs. These themes inherit Papirus-Light
+# or Papirus-Dark and override those names with color PNGs
+# rendered from the Papirus 24x24 icons, so folders stay yellow
+# in the sidebar too. The dark one serves the dark GTK theme,
+# where Papirus-Dark draws its monochrome icons in light gray.
 #
 # The PNG format matters: GTK recolors any file named
 # *-symbolic.svg, but draws *-symbolic.png as a plain image.
 # The directories are Scalable so that GTK 4 picks these files
 # over the scalable SVGs of the parent theme.
 #
-# Usage: build-theme.py DEST_DIR SOURCE_DIR
+# Usage: build-theme.py DEST_DIR VARIANT
 #   DEST_DIR    theme directory to create (replaced if present)
-#   SOURCE_DIR  Papirus size directory, e.g. .../Papirus-Light/24x24
+#   VARIANT     Light or Dark: the Papirus theme to build from,
+#               read from /usr/share/icons/Papirus-<VARIANT>/24x24
 # ============================================================
 
 import math
@@ -54,9 +58,9 @@ ICONS = {
 SOURCE_NAMES = {"xapp-user-favorites": "user-bookmarks"}
 
 INDEX_HEAD = """[Icon Theme]
-Name=Papirus-Light-Glow
-Comment=Papirus-Light with color sidebar icons (Glow)
-Inherits=Papirus-Light,breeze,hicolor
+Name=Papirus-{variant}-Glow
+Comment=Papirus-{variant} with color sidebar icons (Glow)
+Inherits=Papirus-{variant},{breeze},hicolor
 Directories={dirs}
 """
 
@@ -268,7 +272,12 @@ def find_source(src, ctx, name):
     return None
 
 
-def main(dest, src):
+def main(dest, variant):
+    if variant not in ("Light", "Dark"):
+        sys.exit("VARIANT must be Light or Dark")
+    src = f"/usr/share/icons/Papirus-{variant}/24x24"
+    if not os.path.isdir(src):
+        sys.exit(f"no Papirus icons at {src}")
     if os.path.isdir(dest):
         shutil.rmtree(dest)
 
@@ -291,7 +300,10 @@ def main(dest, src):
 
     dirs = [f"symbolic/{ctx}" for ctx in ICONS]
     with open(os.path.join(dest, "index.theme"), "w") as f:
-        f.write(INDEX_HEAD.format(dirs=",".join(dirs)))
+        f.write(INDEX_HEAD.format(
+            variant=variant,
+            breeze="breeze-dark" if variant == "Dark" else "breeze",
+            dirs=",".join(dirs)))
         for ctx in ICONS:
             f.write(INDEX_DIR.format(ctx=ctx, context=ctx.capitalize()))
 
@@ -300,5 +312,5 @@ def main(dest, src):
 
 if __name__ == "__main__":
     if len(sys.argv) != 3:
-        sys.exit("usage: build-theme.py DEST_DIR SOURCE_DIR")
+        sys.exit("usage: build-theme.py DEST_DIR Light|Dark")
     main(sys.argv[1], sys.argv[2])

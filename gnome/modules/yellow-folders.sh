@@ -6,20 +6,22 @@
 # dirs so that Nemo / Files show yellow folders in list view too
 # (not just at big zoom).
 #
-# Builds Papirus-Light-Glow, a theme that inherits Papirus-Light
-# and replaces the monochrome sidebar icons of Nemo and Files
-# with color ones, then activates it.
-#
-# Forces the light variant always — yellow folders stay yellow
-# even when the desktop is in dark mode.
+# Builds Papirus-Light-Glow and Papirus-Dark-Glow, themes that
+# inherit Papirus-Light and Papirus-Dark and replace the
+# monochrome sidebar icons of Nemo and Files with color ones,
+# then activates the one that matches the desktop's style
+# (Settings > Appearance, or the Dark Style toggle). The Glow
+# extension switches between the two when the style changes.
 # ============================================================
 
 set -euo pipefail
 
 STATE_FILE="$HOME/.config/glow/yellow-folders.state"
 COLORIZE_BACKUP="/usr/share/icons/_glow-colorize-backup"
-GLOW_THEME="Papirus-Light-Glow"
-GLOW_THEME_DIR="$HOME/.local/share/icons/$GLOW_THEME"
+ICONS_DIR="$HOME/.local/share/icons"
+GLOW_LIGHT="Papirus-Light-Glow"
+GLOW_DARK="Papirus-Dark-Glow"
+INTERFACE_SCHEMA="org.gnome.desktop.interface"
 BUILD_THEME="$(cd "$(dirname "${BASH_SOURCE[0]}")/../assets/icons" && pwd)/build-theme.py"
 
 source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
@@ -114,49 +116,81 @@ restore_small_folders() {
     ok "Original icons restored"
 }
 
-# Falls back to plain Papirus-Light when the build fails, so the
-# module still leaves a working icon theme behind.
-build_glow_theme() {
-    info "Building $GLOW_THEME (color sidebar icons)..."
-    local count
-    if count=$(python3 "$BUILD_THEME" "$GLOW_THEME_DIR" /usr/share/icons/Papirus-Light/24x24); then
-        gtk-update-icon-cache -f "$GLOW_THEME_DIR" 2>/dev/null || true
-        ok "$GLOW_THEME built with $count icons in $GLOW_THEME_DIR"
-        ACTIVE_THEME="$GLOW_THEME"
+# The desktop's style, dark or light, from the color scheme that
+# Settings, the Dark Style toggle, and Zorin Appearance set.
+current_style() {
+    if [[ "$(gsettings get "$INTERFACE_SCHEMA" color-scheme 2>/dev/null | tr -d "'")" == "prefer-dark" ]]; then
+        echo dark
     else
-        warn "Could not build $GLOW_THEME (needs python3-gi); using Papirus-Light"
-        rm -rf "$GLOW_THEME_DIR"
-        ACTIVE_THEME="Papirus-Light"
+        echo light
     fi
 }
 
-remove_glow_theme() {
-    if [[ -d "$GLOW_THEME_DIR" ]]; then
-        rm -rf "$GLOW_THEME_DIR"
-        ok "Removed $GLOW_THEME_DIR"
-    fi
+# Builds the light and the dark theme; a variant that fails to build
+# falls back to the plain Papirus one, so the module still leaves a
+# working icon theme behind. Sets LIGHT_THEME and DARK_THEME.
+build_glow_themes() {
+    local variant name count
+    for variant in Light Dark; do
+        name="Papirus-$variant-Glow"
+        info "Building $name (color sidebar icons)..."
+        if count=$(python3 "$BUILD_THEME" "$ICONS_DIR/$name" "$variant"); then
+            gtk-update-icon-cache -f "$ICONS_DIR/$name" 2>/dev/null || true
+            ok "$name built with $count icons in $ICONS_DIR/$name"
+        else
+            warn "Could not build $name (needs python3-gi); using Papirus-$variant"
+            rm -rf "${ICONS_DIR:?}/$name"
+            name="Papirus-$variant"
+        fi
+        if [[ "$variant" == Light ]]; then
+            LIGHT_THEME="$name"
+        else
+            DARK_THEME="$name"
+        fi
+    done
+}
+
+remove_glow_themes() {
+    local name
+    for name in "$GLOW_LIGHT" "$GLOW_DARK"; do
+        if [[ -d "$ICONS_DIR/$name" ]]; then
+            rm -rf "${ICONS_DIR:?}/$name"
+            ok "Removed $ICONS_DIR/$name"
+        fi
+    done
 }
 
 activate_icon_theme() {
     mkdir -p "$(dirname "$STATE_FILE")"
 
-    local gnome_cur cinn_cur
+    local gnome_cur cinn_cur prev_gnome prev_cinn active
     gnome_cur=$(gsettings get org.gnome.desktop.interface icon-theme 2>/dev/null | tr -d "'" || echo '')
     cinn_cur=$(gsettings get org.cinnamon.desktop.interface icon-theme 2>/dev/null | tr -d "'" || echo '')
 
+    # What to put back on --remove: the themes before the first install.
+    prev_gnome=$(grep '^previous_gnome=' "$STATE_FILE" 2>/dev/null | cut -d= -f2- | tr -d "'" || true)
+    prev_cinn=$(grep '^previous_cinnamon=' "$STATE_FILE" 2>/dev/null | cut -d= -f2- | tr -d "'" || true)
     if [[ ! -f "$STATE_FILE" ]]; then
-        {
-            [[ -n "$gnome_cur" && "$gnome_cur" != "Papirus"* ]] && echo "previous_gnome='$gnome_cur'"
-            [[ -n "$cinn_cur"  && "$cinn_cur"  != "Papirus"* ]] && echo "previous_cinnamon='$cinn_cur'"
-        } > "$STATE_FILE"
+        [[ -n "$gnome_cur" && "$gnome_cur" != "Papirus"* ]] && prev_gnome="$gnome_cur"
+        [[ -n "$cinn_cur"  && "$cinn_cur"  != "Papirus"* ]] && prev_cinn="$cinn_cur"
     fi
+    {
+        [[ -n "$prev_gnome" ]] && echo "previous_gnome='$prev_gnome'"
+        [[ -n "$prev_cinn" ]] && echo "previous_cinnamon='$prev_cinn'"
+        # The pair the Glow extension switches between with the style.
+        echo "icons_light='$LIGHT_THEME'"
+        echo "icons_dark='$DARK_THEME'"
+    } > "$STATE_FILE"
+
+    active="$LIGHT_THEME"
+    [[ "$(current_style)" == dark ]] && active="$DARK_THEME"
 
     # Activate the theme EVERYWHERE.
     # Nautilus reads from the GNOME schema, Nemo reads from the Cinnamon schema.
-    gsettings set org.gnome.desktop.interface icon-theme "$ACTIVE_THEME"
-    gsettings set org.cinnamon.desktop.interface icon-theme "$ACTIVE_THEME" 2>/dev/null || true
-    gsettings set org.cinnamon.desktop.interface icon-theme-backup "$ACTIVE_THEME" 2>/dev/null || true
-    ok "Icon theme set to $ACTIVE_THEME (GNOME + Cinnamon)"
+    gsettings set org.gnome.desktop.interface icon-theme "$active"
+    gsettings set org.cinnamon.desktop.interface icon-theme "$active" 2>/dev/null || true
+    gsettings set org.cinnamon.desktop.interface icon-theme-backup "$active" 2>/dev/null || true
+    ok "Icon theme set to $active (GNOME + Cinnamon); $LIGHT_THEME and $DARK_THEME follow the style"
 }
 
 restore_previous_icon_theme() {
@@ -195,14 +229,14 @@ case "$cmd" in
         ensure_papirus_folders_installed
         apply_yellow_color
         colorize_small_folders
-        build_glow_theme
+        build_glow_themes
         activate_icon_theme
         ;;
     remove)
         step "yellow-folders: reverting"
         restore_small_folders
         restore_previous_icon_theme
-        remove_glow_theme
+        remove_glow_themes
         info "Papirus package left installed. To fully remove: ${DIM}sudo apt remove papirus-icon-theme${NC}"
         ;;
     *)

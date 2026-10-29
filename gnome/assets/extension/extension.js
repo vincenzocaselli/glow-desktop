@@ -95,12 +95,17 @@ const CFG = {
     batteryBoltOutline: [20, 20, 20],
 
     // Fill colors (r, g, b) and the thresholds, in percent, below which
-    // the low and critical colors apply.
-    // Light enough for the dark digits drawn over them: at least 5:1
-    // against the panel's text color.
+    // the low and critical colors apply. The first set is for a panel
+    // with dark text (the light theme): light enough for the dark digits
+    // drawn over them, at least 5:1 against the text. The second set is
+    // for a panel with light text (the dark theme, or a black panel):
+    // dark enough for white digits.
     batteryColor: [0, 255, 0],
     batteryColorLow: [245, 196, 90],
     batteryColorCritical: [240, 128, 128],
+    batteryColorOnDark: [30, 122, 58],
+    batteryColorLowOnDark: [138, 90, 0],
+    batteryColorCriticalOnDark: [165, 42, 42],
     batteryLow: 20,
     batteryCritical: 10,
 
@@ -115,10 +120,14 @@ const CFG = {
     diskCornerRadius: 2,
     diskRefreshSeconds: 60,
     // Used-space fill (r, g, b, alpha), and the colors and thresholds,
-    // in percent of free space, below which they apply.
+    // in percent of free space, below which they apply; the second set
+    // is for a panel with light text, as for the battery.
     diskColor: [143, 200, 255, 1],
     diskColorLow: [245, 196, 90, 1],
     diskColorCritical: [240, 128, 128, 1],
+    diskColorOnDark: [26, 86, 143, 1],
+    diskColorLowOnDark: [138, 90, 0, 1],
+    diskColorCriticalOnDark: [165, 42, 42, 1],
     diskLow: 15,
     diskCritical: 7,
 
@@ -175,6 +184,13 @@ const CFG = {
     // so every window stays in sight; the Shell keeps one row and scrolls
     // it. Up and Down move by a row. false keeps the Shell's list.
     switcherRows: true,
+
+    // Follow the desktop's style (Settings > Appearance, the Dark Style
+    // toggle, Zorin Appearance): when it changes, put the Glow GTK theme,
+    // icon theme, and Shell theme of the new style in place, as recorded
+    // by theme-tweaks and yellow-folders at install. false leaves the
+    // themes alone.
+    followStyle: true,
 };
 
 // -------------------- FrameGlow --------------------
@@ -462,12 +478,19 @@ function formatDuration(seconds) {
     return h > 0 ? `${h} h ${String(m).padStart(2, '0')} min` : `${m} min`;
 }
 
-function fillColor(percentage) {
+// The panel's text is light on the dark theme (and on a black panel):
+// the fills under it come from the OnDark set then.
+function lightText(fg) {
+    return 0.2126 * fg.red + 0.7152 * fg.green + 0.0722 * fg.blue > 128;
+}
+
+function fillColor(percentage, onDark) {
+    const suffix = onDark ? 'OnDark' : '';
     if (percentage <= CFG.batteryCritical)
-        return CFG.batteryColorCritical;
+        return CFG[`batteryColorCritical${suffix}`];
     if (percentage <= CFG.batteryLow)
-        return CFG.batteryColorLow;
-    return CFG.batteryColor;
+        return CFG[`batteryColorLow${suffix}`];
+    return CFG[`batteryColor${suffix}`];
 }
 
 // Resize a drawing to fit its content at full size, from an idle
@@ -640,7 +663,7 @@ class Battery {
         const innerH = bodyH - 2 * pad;
         const fillW = Math.max(innerW * pct / 100, pct > 0 ? 1.5 * scale : 0);
         if (fillW > 0) {
-            const [r, g, b] = fillColor(pct);
+            const [r, g, b] = fillColor(pct, lightText(fg));
             cr.setSourceRGBA(r / 255, g / 255, b / 255, 1);
             roundedRect(cr, x0 + pad, y0 + pad, fillW, innerH,
                 Math.min(1.8 * scale, fillW / 2));
@@ -922,8 +945,9 @@ class DiskSpace {
         // Fill proportional to the space used.
         if (this._size > 0) {
             const freePct = 100 * this._free / this._size;
-            const [r, g, b, a] = freePct <= CFG.diskCritical ? CFG.diskColorCritical
-                : freePct <= CFG.diskLow ? CFG.diskColorLow : CFG.diskColor;
+            const suffix = lightText(fg) ? 'OnDark' : '';
+            const [r, g, b, a] = freePct <= CFG.diskCritical ? CFG[`diskColorCritical${suffix}`]
+                : freePct <= CFG.diskLow ? CFG[`diskColorLow${suffix}`] : CFG[`diskColor${suffix}`];
             cr.save();
             roundedRect(cr, x0 + pad, y0 + pad, bodyW - 2 * pad, innerH,
                 Math.max(radius - pad / 2, 0.5));
@@ -1272,7 +1296,162 @@ class PreviewWarmer {
     }
 }
 
-// -------------------- Extension --------------------
+// -------------------- StyleFollower --------------------
+// The desktop's style lives in the color-scheme setting, which GNOME
+// Settings, the Dark Style toggle, and Zorin Appearance write. Zorin's
+// toggle also swaps the last word of a Zorin theme name, which lands on
+// the other Glow copy (ZorinBlue-Glow-Light to ZorinBlue-Glow-Dark); the
+// others leave the Glow themes behind. This follows the color scheme and
+// puts the Glow GTK theme, Shell theme, and icon theme of the new style
+// in place, from the pairs theme-tweaks and yellow-folders recorded in
+// ~/.config/glow. A theme Glow did not install is left alone.
+class StyleFollower {
+    constructor() {
+        this._interface = new Gio.Settings({schema_id: 'org.gnome.desktop.interface'});
+        this._cinnamon = settingsFor('org.cinnamon.desktop.interface');
+        this._shell = settingsFor('org.gnome.shell.extensions.user-theme');
+        this._timeoutId = 0;
+        this._ids = ['color-scheme', 'gtk-theme'].map(key =>
+            this._interface.connect(`changed::${key}`, () => this._schedule()));
+        this._apply();
+    }
+
+    // The toggle and Zorin Appearance write several keys in a row: act
+    // once they have all landed.
+    _schedule() {
+        if (this._timeoutId)
+            GLib.Source.remove(this._timeoutId);
+        this._timeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 300, () => {
+            this._timeoutId = 0;
+            this._apply();
+            return GLib.SOURCE_REMOVE;
+        });
+    }
+
+    _apply() {
+        const dark = this._interface.get_string('color-scheme') === 'prefer-dark';
+        const style = dark ? 'dark' : 'light';
+        const themes = readState('theme-tweaks.state');
+        const icons = readState('yellow-folders.state');
+
+        // GTK theme: the Glow copy of the style's variant, when the theme
+        // in use is one of the pair or a Glow copy of it.
+        const gtk = themes[`gtk_${style}`];
+        if (gtk && themeDirExists(gtk, 'gtk-3.0')) {
+            const known = new Set([
+                themes.light, themes.dark, themes.gtk_light, themes.gtk_dark,
+                themes.previous_gtk_theme,
+                themes.light && `${themes.light}-Glow`, themes.dark && `${themes.dark}-Glow`,
+            ].filter(Boolean));
+            const current = this._interface.get_string('gtk-theme');
+            if (current !== gtk && known.has(current)) {
+                this._interface.set_string('gtk-theme', gtk);
+                console.log(`Glow: ${style} style, GTK theme ${gtk}`);
+            }
+        }
+
+        // Shell theme: the one theme-tweaks recorded for the style (on Zorin
+        // the dark one is ZorinGrey-Dark, neutral like the dark GTK copy).
+        // Zorin's toggle has already swapped the variant word by now
+        // (ZorinBlue-Light to ZorinBlue-Dark, and ZorinGrey-Dark to
+        // ZorinGrey-Light on the way back): those names count as ours too.
+        const shell = themes[`shell_${style}`] ?? themes[style];
+        if (this._shell && shell && themeDirExists(shell, 'gnome-shell')) {
+            const known = new Set([
+                themes.light, themes.dark, themes.shell_light, themes.shell_dark,
+                swapVariant(themes.light), swapVariant(themes.dark),
+                swapVariant(themes.shell_light), swapVariant(themes.shell_dark),
+            ].filter(Boolean));
+            const current = this._shell.get_string('name');
+            if (current !== shell && known.has(current))
+                this._shell.set_string('name', shell);
+        }
+
+        // Icon theme: Zorin Appearance puts its own icons back on every
+        // switch, so a Zorin or Papirus theme gives way to the Glow one.
+        const icon = icons[`icons_${style}`];
+        if (icon && iconThemeExists(icon)) {
+            for (const settings of [this._interface, this._cinnamon]) {
+                if (!settings)
+                    continue;
+                const current = settings.get_string('icon-theme');
+                if (current !== icon && /^(Papirus|Zorin)/.test(current)) {
+                    settings.set_string('icon-theme', icon);
+                    if (settings === this._cinnamon)
+                        settings.set_string('icon-theme-backup', icon);
+                }
+            }
+        }
+    }
+
+    destroy() {
+        if (this._timeoutId)
+            GLib.Source.remove(this._timeoutId);
+        this._timeoutId = 0;
+        for (const id of this._ids)
+            this._interface.disconnect(id);
+        this._ids = [];
+        this._interface = null;
+        this._cinnamon = null;
+        this._shell = null;
+    }
+}
+
+// A Gio.Settings for a schema that may be missing (the Cinnamon one on a
+// desktop without Nemo, user-theme without the extension).
+function settingsFor(schemaId) {
+    const source = Gio.SettingsSchemaSource.get_default();
+    if (!source?.lookup(schemaId, true))
+        return null;
+    return new Gio.Settings({schema_id: schemaId});
+}
+
+// The key='value' lines of a Glow module's state file in ~/.config/glow.
+function readState(name) {
+    const out = {};
+    const path = GLib.build_filenamev([GLib.get_user_config_dir(), 'glow', name]);
+    try {
+        const [ok, bytes] = GLib.file_get_contents(path);
+        if (!ok)
+            return out;
+        for (const line of new TextDecoder().decode(bytes).split('\n')) {
+            const m = /^(\w+)='?([^']*)'?$/.exec(line.trim());
+            if (m && m[2])
+                out[m[1]] = m[2];
+        }
+    } catch (e) {
+        // No state: the module is not installed.
+    }
+    return out;
+}
+
+// ZorinBlue-Light for ZorinBlue-Dark and the other way round.
+function swapVariant(name) {
+    if (!name)
+        return null;
+    if (name.endsWith('-Light'))
+        return `${name.slice(0, -6)}-Dark`;
+    if (name.endsWith('-Dark'))
+        return `${name.slice(0, -5)}-Light`;
+    return null;
+}
+
+function themeDirExists(name, part) {
+    return [
+        `${GLib.get_home_dir()}/.themes`,
+        `${GLib.get_user_data_dir()}/themes`,
+        '/usr/share/themes',
+    ].some(dir => GLib.file_test(`${dir}/${name}/${part}`, GLib.FileTest.IS_DIR));
+}
+
+function iconThemeExists(name) {
+    return [
+        `${GLib.get_user_data_dir()}/icons`,
+        `${GLib.get_home_dir()}/.icons`,
+        '/usr/share/icons',
+    ].some(dir => GLib.file_test(`${dir}/${name}/index.theme`, GLib.FileTest.EXISTS));
+}
+
 // -------------------- PreviewRing --------------------
 // The overview marks the window under the pointer, or the one that Tab
 // and the arrow keys reached, only with its title and close button. A
@@ -1821,6 +2000,15 @@ export default class Glow extends Extension {
             }
         }
 
+        if (CFG.followStyle) {
+            try {
+                this._style = new StyleFollower();
+            } catch (e) {
+                console.warn(`Glow: style following disabled: ${e.message}`);
+                this._style = null;
+            }
+        }
+
         this._focusHandlerId = global.display.connect(
             'notify::focus-window',
             () => this._onFocusChanged()
@@ -1857,6 +2045,8 @@ export default class Glow extends Extension {
         this._ring = null;
         this._navigator?.destroy();
         this._navigator = null;
+        this._style?.destroy();
+        this._style = null;
         this._switcher?.destroy();
         this._switcher = null;
         this._switcherRows?.destroy();
